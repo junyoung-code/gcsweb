@@ -52,7 +52,6 @@ export default function QrshopPayClient() {
 
       <section aria-label="결제할 주문" className="mt-8 rounded-lg bg-white p-4">
         <div className="flex items-center justify-between"><span className="typo-body-xsmall text-neutral-8">주문번호</span><strong className="typo-body-xsmall-bold text-neutral-12">{order.orderCode}</strong></div>
-        <div className="mt-3 flex items-center justify-between"><span className="typo-body-xsmall text-neutral-8">주문자</span><strong className="typo-body-xsmall-bold text-neutral-12">{order.buyerName}</strong></div>
         <div className="mt-3 flex items-center justify-between"><span className="typo-body-xsmall text-neutral-8">결제 수단</span><strong className="typo-body-xsmall-bold text-neutral-12">{order.paymentMethod === 'online' ? '온라인 결제' : '현장 결제'}</strong></div>
         <div className="my-4 border-t border-dashed border-neutral-5" />
         <div className="flex items-center justify-between"><span className="typo-body-small-bold text-neutral-12">총 결제금액</span><strong className="typo-heading-xsmall text-orange-6">{formatWon(order.totalAmount)}</strong></div>

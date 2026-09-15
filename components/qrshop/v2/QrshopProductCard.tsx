@@ -15,7 +15,17 @@ export default function QrshopProductCard({ product, selected, onSelect }: Qrsho
         <span className="typo-body-xxsmall truncate text-neutral-7">{product.option ?? '단일 옵션'}</span>
         <span className="mt-auto flex items-center justify-between gap-2">
           <span className="typo-body-xsmall-bold text-neutral-12">{formatWon(product.price)}</span>
-          {selected ? <Image src="/assets/icons/filled/Filled/Bag 3.svg" alt="장바구니에 담김" width={20} height={20} className="shrink-0" /> : null}
+          {selected ? (
+            <span
+              role="img"
+              aria-label="장바구니에 담김"
+              className="h-5 w-5 shrink-0 bg-orange-5"
+              style={{
+                WebkitMask: "url('/assets/icons/filled/Filled/Bag 3.svg') center / contain no-repeat",
+                mask: "url('/assets/icons/filled/Filled/Bag 3.svg') center / contain no-repeat",
+              }}
+            />
+          ) : null}
         </span>
       </span>
     </button>

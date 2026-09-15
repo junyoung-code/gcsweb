@@ -51,8 +51,7 @@ function makeOrderCode(): string {
 
 function validateDraft(draft: QrshopOrderDraft): void {
   if (draft.lines.length === 0) throw new Error('상품을 한 개 이상 선택해 주세요.');
-  if (!draft.buyerName.trim()) throw new Error('주문자 이름을 입력해 주세요.');
-  if (!/^01[016789]-?\d{3,4}-?\d{4}$/.test(draft.buyerPhone.trim())) {
+  if (draft.buyerPhone.trim() && !/^01[016789]-?\d{3,4}-?\d{4}$/.test(draft.buyerPhone.trim())) {
     throw new Error('휴대폰 번호를 확인해 주세요.');
   }
 
@@ -94,7 +93,7 @@ export function createQrshopMockService(
           0,
         ),
         lines: draft.lines.map((line) => ({ ...line })),
-        buyerName: draft.buyerName.trim(),
+        buyerName: draft.buyerName.trim() || '현장 주문',
         buyerPhone: draft.buyerPhone.trim(),
         paymentMethod: draft.paymentMethod,
         createdAt: new Date().toISOString(),

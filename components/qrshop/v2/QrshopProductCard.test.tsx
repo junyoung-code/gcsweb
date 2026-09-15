@@ -30,6 +30,6 @@ describe('QrshopProductCard', () => {
   it('선택된 상품은 장바구니 상태를 노출한다', () => {
     render(<QrshopProductCard product={product} selected onSelect={() => undefined} />);
     expect(screen.getByRole('button')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByAltText('장바구니에 담김')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '장바구니에 담김' })).toHaveClass('bg-orange-5');
   });
 });

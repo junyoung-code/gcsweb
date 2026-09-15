@@ -15,15 +15,9 @@ afterEach(cleanup);
 function renderPanel(overrides: Partial<React.ComponentProps<typeof QrshopCartPanel>> = {}) {
   const props: React.ComponentProps<typeof QrshopCartPanel> = {
     lines: [line],
-    buyerName: '김잇장',
-    buyerPhone: '010-1234-5678',
-    paymentMethod: 'online',
     agreed: true,
     submitting: false,
     error: null,
-    onBuyerNameChange: vi.fn(),
-    onBuyerPhoneChange: vi.fn(),
-    onPaymentMethodChange: vi.fn(),
     onAgreementChange: vi.fn(),
     onQuantityChange: vi.fn(),
     onRemove: vi.fn(),
@@ -35,17 +29,19 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof QrshopCartPa
 }
 
 describe('QrshopCartPanel', () => {
-  it('선택 상품 합계와 주문 정보를 표시하고 제출한다', () => {
+  it('선택 상품 합계와 Figma 결제 항목만 표시하고 제출한다', () => {
     const props = renderPanel();
     expect(screen.getAllByText('15,000원')).toHaveLength(2);
-    expect(screen.getByDisplayValue('김잇장')).toBeInTheDocument();
+    expect(screen.queryByLabelText('주문자 이름')).not.toBeInTheDocument();
+    expect(screen.queryByText('온라인 결제')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '쇼핑몰 이용약관 보기' })).toHaveAttribute('href', '/terms/terms-of-service');
 
     fireEvent.click(screen.getByRole('button', { name: '결제하기' }));
     expect(props.onSubmit).toHaveBeenCalledOnce();
   });
 
   it('빈 장바구니에서는 결제 버튼을 비활성화한다', () => {
-    renderPanel({ lines: [], buyerName: '', buyerPhone: '', agreed: false });
+    renderPanel({ lines: [], agreed: false });
     expect(screen.getByRole('button', { name: '결제하기' })).toBeDisabled();
     expect(screen.getByText('0원')).toBeInTheDocument();
   });
@@ -56,6 +52,20 @@ describe('QrshopCartPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: '무슨무슨 키링 삭제' }));
     expect(props.onQuantityChange).toHaveBeenCalledWith('keyring-black', 2);
     expect(props.onRemove).toHaveBeenCalledWith('keyring-black');
+  });
+
+  it('선택 상품이 6개 이상이면 상품 목록만 제한 높이로 스크롤한다', () => {
+    const lines = Array.from({ length: 6 }, (_, index) => ({
+      ...line,
+      productId: `product-${index + 1}`,
+      productName: `상품 ${index + 1}`,
+    }));
+    renderPanel({ lines });
+
+    const list = screen.getByRole('list', { name: '선택 상품 목록' });
+    expect(list).toHaveClass('max-h-[512px]', 'overflow-y-auto');
+    expect(screen.getByText('결제 금액').closest('div')?.parentElement).not.toBe(list);
+    expect(screen.getByRole('button', { name: '결제하기' })).toBeVisible();
   });
 
   it('핸들을 아래로 충분히 끌면 주문 정보를 접는다', () => {

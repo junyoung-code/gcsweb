@@ -8,6 +8,7 @@ export interface QrshopProduct {
   option?: string;
   price: number;
   imageUrl?: string;
+  soldOut?: boolean;
 }
 
 export interface QrshopCartLine {
