@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/button/Button';
-import { qrshopMockService } from '@/lib/mocks';
+import { qrshopRealService } from '@/lib/services';
 import { formatWon } from '@/lib/utils';
 import type { QrshopOrderResult, QrshopPaymentOutcome, QrshopPaymentState } from '@/types/qrshop';
 import QrshopStateView from './QrshopStateView';
@@ -18,19 +18,22 @@ export default function QrshopPayClient() {
   useEffect(() => {
     if (!orderId) { setError('주문 번호가 없습니다.'); return; }
     let cancelled = false;
-    qrshopMockService.getOrder(orderId).then((result) => {
-      if (!cancelled) { setOrder(result); setPaymentState(result.status === 'failed' ? 'failed' : 'idle'); }
+    qrshopRealService.getOrder(orderId).then((result) => {
+      if (cancelled) return;
+      // 현장결제 주문은 접수 즉시 끝나므로(카운터에서 결제) 가짜 결제 화면을 건너뛴다.
+      if (result.status === 'paid') { router.replace(`/QRshop/result?orderId=${encodeURIComponent(orderId)}`); return; }
+      setOrder(result); setPaymentState(result.status === 'failed' ? 'failed' : 'idle');
     }).catch((reason: unknown) => {
       if (!cancelled) setError(reason instanceof Error ? reason.message : '주문 정보를 불러오지 못했습니다.');
     });
     return () => { cancelled = true; };
-  }, [orderId]);
+  }, [orderId, router]);
 
   const process = async (outcome: QrshopPaymentOutcome) => {
     if (!orderId || paymentState === 'processing') return;
     setPaymentState('processing'); setError(null);
     try {
-      await qrshopMockService.processPayment(orderId, outcome);
+      await qrshopRealService.processPayment(orderId, outcome);
       setPaymentState(outcome === 'success' ? 'succeeded' : 'failed');
       router.push(`/QRshop/result?orderId=${encodeURIComponent(orderId)}`);
     } catch (reason) {

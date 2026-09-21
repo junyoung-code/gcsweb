@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { createQrshopMockService, qrshopMockService } from '@/lib/mocks';
+import { createQrshopMockService } from '@/lib/mocks';
+import { qrshopRealService } from '@/lib/services';
 import type { QrshopCartLine, QrshopPaymentMethod, QrshopProduct } from '@/types/qrshop';
 import QrshopCartPanel from './QrshopCartPanel';
 import QrshopProductCard from './QrshopProductCard';
@@ -17,7 +18,7 @@ export default function QrshopOrderClient() {
   const service = useMemo(() => {
     if (scenario === 'empty') return createQrshopMockService({ catalogScenario: { kind: 'empty', data: { items: [], total: 0 }, delayMs: 200 } });
     if (scenario === 'error') return createQrshopMockService({ catalogScenario: { kind: 'error', message: '상품을 불러오지 못했습니다.', delayMs: 200 } });
-    return qrshopMockService;
+    return qrshopRealService;
   }, [scenario]);
   const [catalog, setCatalog] = useState<CatalogState>({ status: 'loading', products: [] });
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -55,7 +56,8 @@ export default function QrshopOrderClient() {
     setSubmitting(true); setSubmitError(null);
     try {
       const order = await service.createOrder({ lines, buyerName, buyerPhone, paymentMethod });
-      router.push(`/QRshop/pay?orderId=${encodeURIComponent(order.orderId)}`);
+      const nextPath = order.status === 'paid' ? '/QRshop/result' : '/QRshop/pay';
+      router.push(`${nextPath}?orderId=${encodeURIComponent(order.orderId)}`);
     } catch (error) { setSubmitError(error instanceof Error ? error.message : '주문을 저장하지 못했습니다.'); }
     finally { setSubmitting(false); }
   };
