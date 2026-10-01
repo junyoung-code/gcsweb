@@ -74,7 +74,7 @@ export async function GET(
       process.env.NEXTAUTH_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
-    const redirectPath = orderUsesQrShopRedirect(order.items) ? '/QRshop/result' : '/shop/orders/buynow/result';
+    const redirectPath = orderUsesQrShopRedirect(order.items) ? '/QRshop/v1/result' : '/shop/orders/buynow/result';
 
     // Buy Now에서는 주문자 정보를 수집하지 않으므로 PG 필수값은 서버 기본값으로 보강한다.
     const buyerName = order.ordererName?.trim() || '구매자';

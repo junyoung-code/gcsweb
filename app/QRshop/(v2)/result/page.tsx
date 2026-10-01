@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { QrshopResultClient } from '@/components/qrshop';
+import { QrshopResultClient } from '@/components/qrshop/v2';
 
 export default function QRshopResultPage() {
   return (
