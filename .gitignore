@@ -46,3 +46,4 @@ next-env.d.ts
 
 .agents/rules/commit-convention.md
 .agents/mcp_config.json
+.mcp.json
