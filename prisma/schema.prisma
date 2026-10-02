@@ -32,8 +32,8 @@ model User {
   likes               Like[]
   notifications       Notification[]
   orders              Order[]
-  posts               Post[]
   scraps              Scrap[]
+  store               Store?
   teams               Team[]
 
   @@index([email])
@@ -256,11 +256,19 @@ model FairShopProduct {
 
 /// QRshop 상점. storeSlug는 상점URL 식별자
 model Store {
-  storeId    String                  @id @default(cuid())
-  name       String
-  storeSlug  String                  @unique
+  storeId   String  @id @default(cuid())
+  /// 상점 소유자. 1인 1상점이므로 unique. 유저가 지워져도 상점 데이터는 남긴다.
+  userId    String? @unique
+  name      String
+  storeSlug String  @unique
+  /// 판매자 화면에 `@handle` 형태로 노출되는 표시용 아이디.
+  handle    String? @unique
+  /// 상점 프로필 이미지.
+  imageUrl  String?
+
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
+  user       User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   categories OnsiteProductCategory[]
   products   OnsiteProduct[]
 }
@@ -279,8 +287,10 @@ model OnsiteProductCategory {
   @@index([storeId])
 }
 
-/// QRshop 상품. price/initStock/currentStock는 hasOption=false이면 상품 레벨에서 직접 사용.
-/// hasOption=true이면 OnsiteProductOption 에서 관리하므로 상품 레벨 값은 NULL.
+/// QRshop 상품.
+/// price는 hasOption 여부와 무관하게 항상 존재하는 **기본가**다.
+/// 옵션을 쓰면 최종가 = price + OnsiteProductOption.surcharge 이고,
+/// initStock/currentStock은 옵션 재고의 합계를 담는다(옵션 미사용이면 입력값 그대로).
 /// price/initStock/currentStock >= 0 은 DB CHECK 제약으로 강제(마이그레이션 참고, Prisma 스키마 문법상 표현 불가).
 model OnsiteProduct {
   productId      String                 @id @default(cuid())
@@ -288,9 +298,11 @@ model OnsiteProduct {
   categoryId     String?
   name           String                 @db.VarChar(20)
   hasOption      Boolean                @default(false)
-  price          Int? /// hasOption=false 일 때 필수(0 이상), hasOption=true 일 때 NULL
-  initStock      Int? /// hasOption=false 일 때 필수(0 이상), hasOption=true 일 때 NULL
-  currentStock   Int? /// 판매 가능 재고(결제 확정 시 차감). hasOption=false 일 때 필수, hasOption=true 일 때 NULL
+  price          Int /// 기본가(0 이상). 옵션 사용 시에도 유지한다.
+  initStock      Int /// 최초 재고(0 이상). 옵션 사용 시 옵션 initStock 합계.
+  currentStock   Int /// 판매 가능 재고(결제 확정 시 차감). 옵션 사용 시 옵션 currentStock 합계.
+  /// 상품 대표 이미지.
+  imageUrl       String?
   /// item.json/FairShopProductTable 이관 추적용(임시). 이관 검증 끝나면 삭제 예정.
   legacyQrItemId String?                @unique
   createdAt      DateTime               @default(now())
@@ -304,13 +316,15 @@ model OnsiteProduct {
   @@index([categoryId])
 }
 
-/// QRshop 상품 옵션. 상품이 hasOption=true 일 때만 사용되며, 가격/재고는 옵션 단위로 관리.
-/// price/initStock/currentStock >= 0 은 DB CHECK 제약으로 강제(마이그레이션 참고, Prisma 스키마 문법상 표현 불가).
+/// QRshop 상품 옵션. 상품이 hasOption=true 일 때만 사용된다.
+/// surcharge는 절대가격이 아니라 상품 기본가에 **더하는 금액**이다.
+/// surcharge/initStock/currentStock >= 0 은 DB CHECK 제약으로 강제(마이그레이션 참고, Prisma 스키마 문법상 표현 불가).
 model OnsiteProductOption {
   optionId       String        @id @default(cuid())
   productId      String
   name           String        @db.VarChar(18)
-  price          Int
+  /// 기본가에 더해지는 추가금(0 이상).
+  surcharge      Int           @default(0)
   initStock      Int
   currentStock   Int /// 판매 가능 재고(결제 확정 시 차감)
   legacyQrItemId String?       @unique /// item.json 이관 추적용(임시). 이관 검증 끝나면 삭제 예정.
@@ -327,19 +341,15 @@ model Scrap {
   projectId String?
   productId String?
   createdAt DateTime @default(now())
-  postId    String?
-  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, projectId])
   @@unique([userId, productId])
-  @@unique([userId, postId])
   @@index([userId])
   @@index([projectId])
   @@index([productId])
-  @@index([postId])
 }
 
 model Image {
@@ -353,35 +363,6 @@ model Image {
 
   @@index([usage])
   @@map("Image")
-}
-
-model Post {
-  id           String   @id @default(cuid())
-  userId       String
-  category     Int      @default(0)
-  title        String
-  subTitle     String?
-  content      String
-  thumbnailUrl String?
-  images       String[]
-  likeCount    Int      @default(0)
-  viewCount    Int      @default(0)
-  isPublic     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  likes        Like[]
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scraps       Scrap[]
-
-  @@index([userId])
-  @@index([category])
-  @@index([isPublic])
-  @@index([createdAt])
-}
-
-model Category {
-  id       String @id @default(cuid())
-  category String @unique
 }
 
 model ProjectCategory {
@@ -472,16 +453,13 @@ model Like {
   id        String   @id @default(cuid())
   userId    String
   productId String?
-  postId    String?
   projectId String?
   createdAt DateTime @default(now())
-  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
   product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
   project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, productId])
-  @@unique([userId, postId])
   @@unique([userId, projectId])
   @@index([userId])
 }

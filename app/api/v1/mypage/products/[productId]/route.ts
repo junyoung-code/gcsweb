@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 import { normalizeImageUrl } from '@/lib/image-url';
 import { apiError, apiErrors } from '@/lib/api-response';
+import { isSelectableProductType } from '@/lib/product-type';
 
 function toDateOnlyInKst(date: Date | null | undefined): string {
   if (!date) return '';
@@ -218,7 +219,7 @@ export async function PATCH(
       noticeImgUrl?: string;
     };
 
-    if (!teamId || typeof teamId !== 'string' || !name?.trim() || typeof type !== 'number' || ![0, 1, 2].includes(type)) {
+    if (!teamId || typeof teamId !== 'string' || !name?.trim() || !isSelectableProductType(type)) {
       return apiErrors.invalidInput('Invalid request input.');
     }
 

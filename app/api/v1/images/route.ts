@@ -56,6 +56,18 @@ const USAGE_POLICIES: Record<string, UsagePolicy> = {
     allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
     requiresAdmin: false,
   },
+  /// 판매자가 올리는 QRshop 현장 상품 사진. OnsiteProduct.imageUrl 에 들어간다.
+  ONSITE_PRODUCT: {
+    maxBytes: 10 * MB,
+    allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+    requiresAdmin: false,
+  },
+  /// 판매자 상점 프로필 이미지. Store.imageUrl 에 들어간다.
+  STORE_PROFILE: {
+    maxBytes: 10 * MB,
+    allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+    requiresAdmin: false,
+  },
 };
 
 function getUsageFromRequest(request: Request, formData: FormData) {

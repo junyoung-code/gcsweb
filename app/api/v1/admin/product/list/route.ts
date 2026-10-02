@@ -34,46 +34,38 @@ export async function GET(request: Request) {
         : {}),
     };
 
-    const [registerRequestCount, updateRequestCount, products] = await Promise.all([
-      repo.product.count({ where: { isAdminApproved: false } }),
-      Promise.resolve(0),
-      repo.product.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          teamId: true,
-          type: true,
-          name: true,
-          description: true,
-          isHome: true,
-          isPublic: true,
-          salesStartDate: true,
-          salesEndDate: true,
-          currentAmount: true,
-          goalAmount: true,
-          likeCount: true,
-          team: { select: { teamName: true } },
-          likes: {
-            where: { userId: auth.session.user.id },
-            select: { id: true },
-          },
-          images: {
-            select: { thumbnailImgUrl: true },
-            orderBy: { createdAt: 'asc' },
-            take: 1,
-          },
+    const products = await repo.product.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        teamId: true,
+        type: true,
+        name: true,
+        description: true,
+        isHome: true,
+        isPublic: true,
+        salesStartDate: true,
+        salesEndDate: true,
+        currentAmount: true,
+        goalAmount: true,
+        likeCount: true,
+        team: { select: { teamName: true } },
+        likes: {
+          where: { userId: auth.session.user.id },
+          select: { id: true },
         },
-      }),
-    ]);
+        images: {
+          select: { thumbnailImgUrl: true },
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+        },
+      },
+    });
 
     return NextResponse.json({
       status: 'success',
       data: {
-        summary: {
-          registerRequestCount,
-          updateRequestCount,
-        },
         products: products.map((p: any) => ({
           id: p.id,
           teamId: p.teamId,

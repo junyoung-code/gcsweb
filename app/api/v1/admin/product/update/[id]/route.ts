@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { normalizeImageUrl } from '@/lib/image-url';
 import { syncProductVariants } from '@/lib/product-variant';
+import { isSelectableProductType } from '@/lib/product-type';
 import {
   isNonEmptyString,
   isNonNegativeInt,
@@ -203,8 +204,7 @@ export async function PATCH(
       !isNonEmptyString(teamId) ||
       !isNonEmptyString(name) ||
       !isNonEmptyString(description) ||
-      !isNonNegativeInt(type) ||
-      ![0, 1, 2].includes(type) ||
+      !isSelectableProductType(type) ||
       !isNonEmptyString(thumbnailUrl) ||
       !parsedDetailImageUrls ||
       !isNonEmptyString(noticeImgUrl) ||

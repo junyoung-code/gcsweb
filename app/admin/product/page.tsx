@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { NavBar } from '@/components/layout';
 import SearchBar from '@/components/ui/common/SearchBar';
@@ -35,10 +34,6 @@ type AdminProductListResponse = {
   status: 'success' | 'error';
   message?: string;
   data?: {
-    summary?: {
-      registerRequestCount?: number;
-      updateRequestCount?: number;
-    };
     products?: AdminProductItem[];
   };
 };
@@ -66,35 +61,12 @@ function calcProgressPercent(currentAmount: number | null, goalAmount: number | 
   return Math.max(0, Math.min(100, Math.round((current / goal) * 100)));
 }
 
-function RequestSummaryBox({
-  registerCount,
-  updateCount,
-}: {
-  registerCount: number;
-  updateCount: number;
-}) {
-  return (
-    <div className="flex h-[35px] w-[109px] shrink-0 items-center justify-center rounded-lg border border-neutral-5 bg-neutral-3 px-[10px] py-[7px]">
-      <div className="flex items-center gap-2 typo-body-xsmall text-neutral-9">
-        <Link href="/admin/product/request/register" className="inline-flex items-center">
-          등록 <span className="text-orange-5">{registerCount}</span>
-        </Link>
-        <span aria-hidden className="h-[14px] w-px bg-neutral-6" />
-        <Link href="/admin/product/request/update" className="inline-flex items-center">
-          수정 <span className="text-orange-5">{updateCount}</span>
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 export default function AdminProductPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<ProductTabKey>('all');
   const [products, setProducts] = useState<AdminProductItem[]>([]);
-  const [summary, setSummary] = useState({ registerRequestCount: 0, updateRequestCount: 0 });
   const [listLoading, setListLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -128,16 +100,11 @@ export default function AdminProductPage() {
         if (cancelled) return;
 
         setProducts((json.data?.products ?? []) as AdminProductItem[]);
-        setSummary({
-          registerRequestCount: Number(json.data?.summary?.registerRequestCount ?? 0),
-          updateRequestCount: Number(json.data?.summary?.updateRequestCount ?? 0),
-        });
         setErrorMessage(null);
       } catch (error: any) {
         console.error(error);
         if (!cancelled) {
           setProducts([]);
-          setSummary({ registerRequestCount: 0, updateRequestCount: 0 });
           setErrorMessage(error?.message ?? '상품글 목록을 불러오지 못했습니다.');
         }
       } finally {
@@ -242,16 +209,11 @@ export default function AdminProductPage() {
         <NavBar variant="title-back" title="상품글 관리" onBack={() => router.push('/admin')} />
 
         <main className="pb-8">
-          <div className="mt-[19px] flex items-center gap-[7px] px-4">
+          <div className="mt-[19px] px-4">
             <SearchBar
-              className="flex-1"
               placeholder="상품명, 팀명으로 검색..."
               value={search}
               onChange={setSearch}
-            />
-            <RequestSummaryBox
-              registerCount={summary.registerRequestCount}
-              updateCount={summary.updateRequestCount}
             />
           </div>
 
