@@ -156,9 +156,12 @@ Prisma ORM 설정 및 스키마 파일입니다.
 #### 📌 스키마 수정 후 필수 작업
 
 ```bash
-npm run db:generate   # Prisma Client 재생성
-npm run db:push       # DB에 스키마 적용 (개발용)
+npm run db:migrate    # 마이그레이션 생성·적용 + Prisma Client 재생성
 ```
+
+- 생성된 `prisma/migrations/` 폴더는 스키마 변경과 함께 커밋합니다.
+- 배포 시에는 `npm start`가 `prisma migrate deploy`를 자동 실행합니다.
+- `npm run db:push`는 마이그레이션 기록을 남기지 않으므로 버려도 되는 로컬 DB에서만 사용합니다.
 
 ---
 
@@ -276,7 +279,7 @@ npm run dev          # 개발 서버 실행
 npm run build        # 프로덕션 빌드
 npm run lint         # ESLint 검사
 npm run db:generate  # Prisma Client 생성
-npm run db:push      # DB 스키마 적용
+npm run db:migrate   # 마이그레이션 생성·적용
 npm run db:studio    # Prisma Studio (DB GUI)
 ```
 

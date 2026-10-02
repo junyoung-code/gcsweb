@@ -69,9 +69,12 @@ Copy-Item env.sample .env
 # Prisma Client 생성
 npm run db:generate
 
-# 데이터베이스에 스키마 적용
-npm run db:push
+# 기존 마이그레이션(prisma/migrations)을 로컬 DB에 적용
+npm run db:migrate
 ```
+
+스키마를 바꿀 때는 `prisma/schema.prisma` 수정 → `npm run db:migrate`(마이그레이션 파일 생성·적용) → 생성된 `prisma/migrations/` 폴더를 함께 커밋합니다.
+운영/배포 DB에는 `npm start`가 `prisma migrate deploy`를 자동 실행합니다.
 
 ### 4. 개발 서버 실행
 
@@ -90,8 +93,8 @@ npm run dev
 | `npm run start` | 프로덕션 서버 실행 |
 | `npm run lint` | ESLint 실행 |
 | `npm run db:generate` | Prisma Client 생성 |
-| `npm run db:push` | 스키마 DB 적용 (개발용) |
-| `npm run db:migrate` | 마이그레이션 생성/적용 |
+| `npm run db:migrate` | 마이그레이션 생성/적용 (`prisma migrate dev`) — 스키마 변경 시 기본 방법 |
+| `npm run db:push` | 마이그레이션 파일 없이 스키마만 DB에 강제 적용. 버려도 되는 로컬 DB에서만 사용 (공유/운영 DB 금지) |
 | `npm run db:studio` | Prisma Studio 실행 |
 
 ## 라이선스

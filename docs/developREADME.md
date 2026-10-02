@@ -80,7 +80,7 @@
 ```bash
 npm install
 npm run db:generate
-npm run db:push
+npm run db:migrate
 npm run dev
 ```
 
@@ -106,8 +106,8 @@ DB는 `prisma/schema.prisma`를 “진실의 원천(source of truth)”으로 �
 - **Like**: 좋아요(여러 타입에 대한 선택적 FK)
 - **VerificationToken**: 토큰 저장(현재는 refresh token 저장소로도 사용)
 
-> DB 변경 시: 스키마 수정 → `npm run db:generate` → `npm run db:push` 순서로 반영합니다.  
-> 운영 환경에서는 `migrate deploy` 전략을 검토할 수 있으나, 현재는 개발 초기 단계라 `db push`를 사용 중입니다.
+> DB 변경 시: `prisma/schema.prisma` 수정 → `npm run db:migrate`(마이그레이션 생성·적용, Client 재생성) → `prisma/migrations/`를 함께 커밋합니다.  
+> 배포 시 `npm start`가 `prisma migrate deploy`를 자동 실행합니다. `db:push`는 마이그레이션 기록이 남지 않으므로 버려도 되는 로컬 DB에서만 사용합니다.
 
 ---
 
