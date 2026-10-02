@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Button from '@/components/ui/button/Button';
-import { qrshopMockService } from '@/lib/mocks';
+import { qrshopRealService } from '@/lib/services';
 import { formatWon } from '@/lib/utils';
 import type { QrshopOrderResult } from '@/types/qrshop';
 import QrshopStateView from './QrshopStateView';
@@ -17,7 +17,7 @@ export default function QrshopResultClient() {
   useEffect(() => {
     if (!orderId) { setError('주문 번호가 없습니다.'); return; }
     let cancelled = false;
-    qrshopMockService.getOrder(orderId).then((result) => { if (!cancelled) setOrder(result); }).catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : '주문 결과를 불러오지 못했습니다.'); });
+    qrshopRealService.getOrder(orderId).then((result) => { if (!cancelled) setOrder(result); }).catch((reason: unknown) => { if (!cancelled) setError(reason instanceof Error ? reason.message : '주문 결과를 불러오지 못했습니다.'); });
     return () => { cancelled = true; };
   }, [orderId]);
 

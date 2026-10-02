@@ -1,8 +1,18 @@
-/** item.json 기준 엽서(동일 name) 묶음: 2개당 3,000원, 홀수 개는 남는 1개는 2,000원 */
+/** 엽서 묶음: 2개당 3,000원, 홀수 개는 남는 1개는 2,000원 */
 
+/** item.json 기준(레거시) 엽서 품목의 name 값. category 정보가 없는 호출부의 폴백으로만 쓴다. */
 export const POSTCARD_ITEM_NAME = '엽서';
 
-export function isPostcardCatalogItem(item: { name: string }): boolean {
+/** OnsiteProductCategory 기준(신규) 엽서 카테고리명. DB 마이그레이션 데이터와 일치. */
+export const POSTCARD_CATEGORY_NAME = '엽서';
+
+/**
+ * category 정보가 있으면 그걸로 판별한다(신규 DB 카탈로그: 상품명이 "엽서 A. 연꽃주황" 등으로
+ * 갈라져 있어 name 은 더 이상 '엽서'와 정확히 같지 않음). category 정보가 없는 호출부
+ * (lib/qrshop/catalog.ts, item.json 기반)는 기존처럼 name 으로 판별한다.
+ */
+export function isPostcardCatalogItem(item: { name: string; categoryName?: string }): boolean {
+  if (item.categoryName !== undefined) return item.categoryName === POSTCARD_CATEGORY_NAME;
   return item.name === POSTCARD_ITEM_NAME;
 }
 
