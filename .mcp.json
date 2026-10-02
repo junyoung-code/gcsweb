@@ -1,0 +1,27 @@
+{
+  "mcpServers": {
+    "figma": {
+      "type": "http",
+      "url": "https://mcp.figma.com/mcp"
+    },
+    "notion": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@notionhq/notion-mcp-server"
+      ],
+      "env": {
+        "NOTION_TOKEN": "${NOTION_TOKEN}"
+      }
+    },
+    "erdcloud": {
+      "type": "http",
+      "url": "https://www.erdcloud.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${ERDCLOUD_TOKEN}"
+      }
+    }
+  }
+}

@@ -43,7 +43,8 @@ next-env.d.ts
 
 # mcp config (local server settings)
 .vscode/mcp.json
+.cursor/mcp.json
 
 .agents/rules/commit-convention.md
 .agents/mcp_config.json
-.mcp.json
+CLAUDE.md
