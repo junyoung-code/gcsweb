@@ -25,6 +25,13 @@ const CreateStoreSchema = z.object({
 const UpdateStoreSchema = z
   .object({
     name: z.string().trim().min(2, '상점명은 2자 이상 입력해주세요.').max(30).optional(),
+    /** 바꾸면 방문객 주문 URL과 QR이 새로 발급된다(상점 수정 화면 안내 문구). */
+    storeSlug: z
+      .string()
+      .trim()
+      .toLowerCase()
+      .regex(STORE_SLUG_PATTERN, '영문 소문자, 숫자, 하이픈으로 3~20자 입력해주세요.')
+      .optional(),
     handle: z.string().trim().min(1).max(30).nullable().optional(),
     imageUrl: z.string().trim().max(2048).nullable().optional(),
   })
@@ -128,8 +135,9 @@ export async function POST(request: Request) {
 /**
  * 상점 수정.
  *
- * storeSlug 는 방문객 주문 URL·QR 의 기준이라 바꾸지 않는다(v1 등록 화면도 읽기전용).
- * 바꿔야 하면 별도 정책이 필요하다.
+ * storeSlug 도 바꿀 수 있다. 상점 수정 화면이 "상점 아이디를 수정할 경우 상점 URL과
+ * QR코드가 새로 발급됩니다"라고 안내하므로, 바뀐 slug 로 만든 visitorOrderUrl 을
+ * 응답에 돌려준다. 이미 배포된 QR 은 더 이상 유효하지 않다.
  */
 export async function PATCH(request: Request) {
   try {
@@ -151,10 +159,19 @@ export async function PATCH(request: Request) {
       if (taken) return apiError(409, 'HANDLE_TAKEN', '이미 사용 중인 핸들입니다.');
     }
 
+    if (input.storeSlug && input.storeSlug !== context.store.storeSlug) {
+      const taken = await prisma.store.findUnique({
+        where: { storeSlug: input.storeSlug },
+        select: { storeId: true },
+      });
+      if (taken) return apiError(409, 'SLUG_TAKEN', '이미 사용 중인 상점 아이디입니다.');
+    }
+
     const store = await prisma.store.update({
       where: { storeId: context.store.storeId },
       data: {
         ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.storeSlug !== undefined ? { storeSlug: input.storeSlug } : {}),
         ...(input.handle !== undefined ? { handle: input.handle } : {}),
         ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl } : {}),
       },
