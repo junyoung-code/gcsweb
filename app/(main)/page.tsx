@@ -259,7 +259,7 @@ function HomeContent() {
         <main className="flex-1">
           <section className="px-4 pt-[18px]">
             <p className="typo-body-small text-orange-5">2026 불교박람회</p>
-            <h1 className="mt-1 text-[24px] font-bold leading-[1.5] text-orange-5">이번 역은 열반, 열반역 입니다.</h1>
+            <h1 className="mt-1 text-[24px] font-bold leading-[1.5] text-orange-5">이번 역은 열반, 열반역 입니다람쥐. (0928 테스트)</h1>
 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
