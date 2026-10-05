@@ -107,6 +107,7 @@ DB는 `prisma/schema.prisma`를 “진실의 원천(source of truth)”으로 �
 - **VerificationToken**: 토큰 저장(현재는 refresh token 저장소로도 사용)
 
 > DB 변경 시: `prisma/schema.prisma` 수정 → `npm run db:migrate`(마이그레이션 생성·적용, Client 재생성) → `prisma/migrations/`를 함께 커밋합니다.  
+> `db:migrate`(`prisma migrate dev`)는 스키마가 어긋나면 데이터 초기화(reset)를 요구할 수 있으므로, `DATABASE_URL`이 로컬/본인 전용 개발 DB일 때만 실행합니다. 운영·팀 공용 DB에는 실행하지 않고, 이미 만들어진 마이그레이션만 적용하는 `npx prisma migrate deploy`를 사용합니다(어떤 DB를 쓸지는 팀에 확인).  
 > 배포 시 `npm start`가 `prisma migrate deploy`를 자동 실행합니다. `db:push`는 마이그레이션 기록이 남지 않으므로 버려도 되는 로컬 DB에서만 사용합니다.
 
 ---
