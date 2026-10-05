@@ -34,6 +34,7 @@ model User {
   orders              Order[]
   posts               Post[]
   scraps              Scrap[]
+  store               Store?
   teams               Team[]
 
   @@index([email])
@@ -254,13 +255,18 @@ model FairShopProduct {
   @@map("FairShopProductTable")
 }
 
-/// QRshop 상점. storeSlug는 상점URL 식별자
+/// QRshop 상점. storeSlug는 상점URL 식별자(사용자가 정하는 값, 변경 가능). 다른 테이블은 불변 키인 storeId를 참조한다.
+/// 판매자(User) 1명당 상점 1개. 소유자가 있는 User는 삭제할 수 없다(Restrict).
+/// 삭제는 판매이력이 없을 때만 가능하며 soft delete 없이 즉시 hard delete 한다.
+/// name 1자 이상, storeSlug ^[a-z0-9]{4,}$ 는 DB CHECK 제약으로 강제(마이그레이션 참고, Prisma 스키마 문법상 표현 불가).
 model Store {
   storeId    String                  @id @default(cuid())
-  name       String
+  userId     String                  @unique
+  name       String                  @db.VarChar(16)
   storeSlug  String                  @unique
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
+  user       User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
   categories OnsiteProductCategory[]
   products   OnsiteProduct[]
 }
