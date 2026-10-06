@@ -93,7 +93,7 @@ function toResponse(product: ProductRow) {
   };
 }
 
-type RouteContext = { params: { productId: string } };
+type RouteContext = { params: { onsiteProductId: string } };
 
 /** 수정 대상이 내 상점 상품인지 확인한다. */
 async function findOwnedProduct(storeId: string, productId: string) {
@@ -110,7 +110,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (!context.store) return apiErrors.notFound('상품을 찾을 수 없습니다.');
     const storeId = context.store.storeId;
 
-    const existing = await findOwnedProduct(storeId, params.productId);
+    const existing = await findOwnedProduct(storeId, params.onsiteProductId);
     if (!existing) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
     const parsed = UpdateProductSchema.safeParse(await request.json());
@@ -136,11 +136,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const updated = await prisma.$transaction(async (tx) => {
       // 옵션 목록이 오면 통째로 갈아끼운다. 부분 수정은 지원하지 않는다.
       if (input.options) {
-        await tx.onsiteProductOption.deleteMany({ where: { productId: params.productId } });
+        await tx.onsiteProductOption.deleteMany({ where: { productId: params.onsiteProductId } });
       }
 
       return tx.onsiteProduct.update({
-        where: { productId: params.productId },
+        where: { productId: params.onsiteProductId },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.price !== undefined ? { price: input.price } : {}),
@@ -167,7 +167,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     return apiSuccess({ product: toResponse(updated) });
   } catch (error) {
-    console.error('[seller/products/:id] PATCH error:', error);
+    console.error('[qrshop/products/:id] PATCH error:', error);
     return apiErrors.serverError();
   }
 }
@@ -185,14 +185,14 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     if (!context.ok) return apiErrors.unauthorized();
     if (!context.store) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
-    const existing = await findOwnedProduct(context.store.storeId, params.productId);
+    const existing = await findOwnedProduct(context.store.storeId, params.onsiteProductId);
     if (!existing) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
-    await prisma.onsiteProduct.delete({ where: { productId: params.productId } });
+    await prisma.onsiteProduct.delete({ where: { productId: params.onsiteProductId } });
 
-    return apiSuccess({ productId: params.productId });
+    return apiSuccess({ productId: params.onsiteProductId });
   } catch (error) {
-    console.error('[seller/products/:id] DELETE error:', error);
+    console.error('[qrshop/products/:id] DELETE error:', error);
     return apiErrors.serverError();
   }
 }

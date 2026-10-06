@@ -123,7 +123,7 @@ export async function GET() {
 
     return apiSuccess({ products: products.map(toResponse) });
   } catch (error) {
-    console.error('[seller/products] GET error:', error);
+    console.error('[qrshop/products] GET error:', error);
     return apiErrors.serverError();
   }
 }
@@ -199,7 +199,7 @@ export async function POST(request: Request) {
 
     return apiSuccess({ product: toResponse(created) });
   } catch (error) {
-    console.error('[seller/products] POST error:', error);
+    console.error('[qrshop/products] POST error:', error);
     return apiErrors.serverError();
   }
 }
