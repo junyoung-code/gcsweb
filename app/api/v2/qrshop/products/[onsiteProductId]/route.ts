@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiErrors, apiSuccess } from '@/lib/api-response';
+import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
 import { getSellerContext } from '@/lib/seller/store';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +73,7 @@ type ProductRow = {
   }>;
 };
 
-function toResponse(product: ProductRow) {
+function toResponse(product: ProductRow, hasSalesHistory: boolean) {
   return {
     id: product.productId,
     name: product.name,
@@ -89,11 +90,25 @@ function toResponse(product: ProductRow) {
       surcharge: option.surcharge,
       stock: option.currentStock,
     })),
+    /** 목록과 같은 모양을 유지한다. 빠지면 수정 직후 카드가 삭제 버튼을 잘못 띄운다. */
+    hasSalesHistory,
     createdAt: product.createdAt.toISOString(),
   };
 }
 
-type RouteContext = { params: { productId: string } };
+/** 결제완료된 주문에 이 상품이 한 번이라도 들어갔는지. */
+async function hasPaidSale(productId: string) {
+  const line = await prisma.orderItem.findFirst({
+    where: {
+      onsiteProductId: productId,
+      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
+    },
+    select: { id: true },
+  });
+  return line !== null;
+}
+
+type RouteContext = { params: { onsiteProductId: string } };
 
 /** 수정 대상이 내 상점 상품인지 확인한다. */
 async function findOwnedProduct(storeId: string, productId: string) {
@@ -110,7 +125,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     if (!context.store) return apiErrors.notFound('상품을 찾을 수 없습니다.');
     const storeId = context.store.storeId;
 
-    const existing = await findOwnedProduct(storeId, params.productId);
+    const existing = await findOwnedProduct(storeId, params.onsiteProductId);
     if (!existing) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
     const parsed = UpdateProductSchema.safeParse(await request.json());
@@ -136,11 +151,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     const updated = await prisma.$transaction(async (tx) => {
       // 옵션 목록이 오면 통째로 갈아끼운다. 부분 수정은 지원하지 않는다.
       if (input.options) {
-        await tx.onsiteProductOption.deleteMany({ where: { productId: params.productId } });
+        await tx.onsiteProductOption.deleteMany({ where: { productId: params.onsiteProductId } });
       }
 
       return tx.onsiteProduct.update({
-        where: { productId: params.productId },
+        where: { productId: params.onsiteProductId },
         data: {
           ...(input.name !== undefined ? { name: input.name } : {}),
           ...(input.price !== undefined ? { price: input.price } : {}),
@@ -165,9 +180,11 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       });
     });
 
-    return apiSuccess({ product: toResponse(updated) });
+    return apiSuccess({
+      product: toResponse(updated, await hasPaidSale(params.onsiteProductId)),
+    });
   } catch (error) {
-    console.error('[seller/products/:id] PATCH error:', error);
+    console.error('[qrshop/products/:id] PATCH error:', error);
     return apiErrors.serverError();
   }
 }
@@ -185,14 +202,14 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     if (!context.ok) return apiErrors.unauthorized();
     if (!context.store) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
-    const existing = await findOwnedProduct(context.store.storeId, params.productId);
+    const existing = await findOwnedProduct(context.store.storeId, params.onsiteProductId);
     if (!existing) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
-    await prisma.onsiteProduct.delete({ where: { productId: params.productId } });
+    await prisma.onsiteProduct.delete({ where: { productId: params.onsiteProductId } });
 
-    return apiSuccess({ productId: params.productId });
+    return apiSuccess({ productId: params.onsiteProductId });
   } catch (error) {
-    console.error('[seller/products/:id] DELETE error:', error);
+    console.error('[qrshop/products/:id] DELETE error:', error);
     return apiErrors.serverError();
   }
 }
