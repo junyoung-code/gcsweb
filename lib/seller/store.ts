@@ -13,7 +13,6 @@ export type SellerStore = {
   storeId: string;
   name: string;
   storeSlug: string;
-  handle: string | null;
   imageUrl: string | null;
 };
 
@@ -21,7 +20,6 @@ const STORE_SELECT = {
   storeId: true,
   name: true,
   storeSlug: true,
-  handle: true,
   imageUrl: true,
 } as const;
 

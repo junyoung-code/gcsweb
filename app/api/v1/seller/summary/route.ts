@@ -59,7 +59,7 @@ export async function GET() {
       store: {
         id: store.storeId,
         name: store.name,
-        handle: store.handle,
+        storeSlug: store.storeSlug,
         imageUrl: store.imageUrl,
         visitorOrderUrl: buildVisitorOrderUrl(store.storeSlug),
       },
