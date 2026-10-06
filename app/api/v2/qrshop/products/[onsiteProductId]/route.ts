@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiErrors, apiSuccess } from '@/lib/api-response';
-import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
+import { hasProductPaidSale } from '@/lib/qrshop/sales-history';
 import { getSellerContext } from '@/lib/seller/store';
 
 export const dynamic = 'force-dynamic';
@@ -96,18 +96,6 @@ function toResponse(product: ProductRow, hasSalesHistory: boolean) {
   };
 }
 
-/** 결제완료된 주문에 이 상품이 한 번이라도 들어갔는지. */
-async function hasPaidSale(productId: string) {
-  const line = await prisma.orderItem.findFirst({
-    where: {
-      onsiteProductId: productId,
-      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
-    },
-    select: { id: true },
-  });
-  return line !== null;
-}
-
 type RouteContext = { params: { onsiteProductId: string } };
 
 /** 수정 대상이 내 상점 상품인지 확인한다. */
@@ -181,7 +169,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     });
 
     return apiSuccess({
-      product: toResponse(updated, await hasPaidSale(params.onsiteProductId)),
+      product: toResponse(updated, await hasProductPaidSale(params.onsiteProductId)),
     });
   } catch (error) {
     console.error('[qrshop/products/:id] PATCH error:', error);
