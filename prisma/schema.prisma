@@ -254,15 +254,13 @@ model FairShopProduct {
   @@map("FairShopProductTable")
 }
 
-/// QRshop 상점. storeSlug는 상점URL 식별자
+/// QRshop 상점
 model Store {
   storeId   String  @id @default(cuid())
-  /// 상점 소유자. 1인 1상점이므로 unique. 유저가 지워져도 상점 데이터는 남긴다.
+  /// 상점 소유자. 1인 1상점이므로 unique. 판매이력이 있는 상점은 소유자(User)가 삭제돼도 null로 남는다(SetNull).
   userId    String? @unique
-  name      String
-  storeSlug String  @unique
-  /// 판매자 화면에 `@handle` 형태로 노출되는 표시용 아이디.
-  handle    String? @unique
+  name      String  @db.VarChar(16)
+  storeSlug String  @unique         // 상점URL 식별자
   /// 상점 프로필 이미지.
   imageUrl  String?
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
-import { apiErrors, apiSuccess } from '@/lib/api-response';
-import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
+import { apiError, apiErrors, apiSuccess } from '@/lib/api-response';
+import { hasProductPaidSale } from '@/lib/qrshop/sales-history';
 import { getSellerContext } from '@/lib/seller/store';
 
 export const dynamic = 'force-dynamic';
@@ -96,18 +96,6 @@ function toResponse(product: ProductRow, hasSalesHistory: boolean) {
   };
 }
 
-/** 결제완료된 주문에 이 상품이 한 번이라도 들어갔는지. */
-async function hasPaidSale(productId: string) {
-  const line = await prisma.orderItem.findFirst({
-    where: {
-      onsiteProductId: productId,
-      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
-    },
-    select: { id: true },
-  });
-  return line !== null;
-}
-
 type RouteContext = { params: { onsiteProductId: string } };
 
 /** 수정 대상이 내 상점 상품인지 확인한다. */
@@ -181,7 +169,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     });
 
     return apiSuccess({
-      product: toResponse(updated, await hasPaidSale(params.onsiteProductId)),
+      product: toResponse(updated, await hasProductPaidSale(params.onsiteProductId)),
     });
   } catch (error) {
     console.error('[qrshop/products/:id] PATCH error:', error);
@@ -193,8 +181,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
  * 상품 삭제.
  *
  * 하드 삭제다(디자인 문구: "삭제된 상품은 다시 복구할 수 없습니다").
- * 지난 주문의 OrderItem 은 onDelete: SetNull 이라 남되 상품 참조만 끊긴다.
- * OrderItem 에 이름·가격이 이미 복사돼 있어 주문 내역 표시에는 지장이 없다.
+ * 결제완료 주문에 팔린 상품(목록의 hasSalesHistory=true)은 삭제 버튼이 감춰지는 상품이라,
+ * 직접 호출해도 409 PRODUCT_HAS_SALES 로 거부한다.
+ * 미결제 주문뿐인 상품은 지워지고, 그 OrderItem 은 onDelete: SetNull 이라 남되 상품 참조만 끊긴다.
  */
 export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
@@ -205,7 +194,13 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
     const existing = await findOwnedProduct(context.store.storeId, params.onsiteProductId);
     if (!existing) return apiErrors.notFound('상품을 찾을 수 없습니다.');
 
-    await prisma.onsiteProduct.delete({ where: { productId: params.onsiteProductId } });
+    // 판매이력 확인과 삭제를 한 트랜잭션에 둬서 그 사이에 결제가 끼어드는 틈을 줄인다.
+    const blocked = await prisma.$transaction(async (tx) => {
+      if (await hasProductPaidSale(params.onsiteProductId, tx)) return true;
+      await tx.onsiteProduct.delete({ where: { productId: params.onsiteProductId } });
+      return false;
+    });
+    if (blocked) return apiError(409, 'PRODUCT_HAS_SALES', '판매 이력이 있는 상품');
 
     return apiSuccess({ productId: params.onsiteProductId });
   } catch (error) {
