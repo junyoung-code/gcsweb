@@ -62,12 +62,6 @@ const USAGE_POLICIES: Record<string, UsagePolicy> = {
     allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
     requiresAdmin: false,
   },
-  /// 판매자 상점 프로필 이미지. Store.imageUrl 에 들어간다.
-  STORE_PROFILE: {
-    maxBytes: 10 * MB,
-    allowedMimes: ['image/jpeg', 'image/png', 'image/webp'],
-    requiresAdmin: false,
-  },
 };
 
 function getUsageFromRequest(request: Request, formData: FormData) {
