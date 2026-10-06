@@ -60,7 +60,6 @@ export async function GET() {
         id: store.storeId,
         name: store.name,
         storeSlug: store.storeSlug,
-        imageUrl: store.imageUrl,
         visitorOrderUrl: buildVisitorOrderUrl(store.storeSlug),
       },
       productCount,

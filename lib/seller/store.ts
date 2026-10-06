@@ -13,14 +13,12 @@ export type SellerStore = {
   storeId: string;
   name: string;
   storeSlug: string;
-  imageUrl: string | null;
 };
 
 const STORE_SELECT = {
   storeId: true,
   name: true,
   storeSlug: true,
-  imageUrl: true,
 } as const;
 
 export type SellerContext =
