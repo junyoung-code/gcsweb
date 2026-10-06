@@ -22,6 +22,30 @@ export function parseProductListFilter(searchParams: URLSearchParams): ProductLi
   };
 }
 
+export const DEFAULT_PAGE_SIZE = 20;
+export const MAX_PAGE_SIZE = 100;
+
+export type Pagination = { page: number; pageSize: number };
+
+/**
+ * `page`(1부터), `pageSize` 쿼리를 읽는다. 기능명세서는 20개 단위 페이지네이션이다.
+ * 없거나 잘못된 값은 기본값으로 대체하고, pageSize 는 상한을 넘기지 못한다.
+ */
+export function parsePagination(searchParams: URLSearchParams): Pagination {
+  const toPositiveInt = (raw: string | null, fallback: number) => {
+    const value = Number(raw);
+    return Number.isInteger(value) && value >= 1 ? value : fallback;
+  };
+
+  return {
+    page: toPositiveInt(searchParams.get('page'), 1),
+    pageSize: Math.min(
+      toPositiveInt(searchParams.get('pageSize'), DEFAULT_PAGE_SIZE),
+      MAX_PAGE_SIZE,
+    ),
+  };
+}
+
 /**
  * 내 상점 상품만 보되, 검색어·카테고리가 있으면 AND 로 좁힌다.
  *

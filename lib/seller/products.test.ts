@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildProductListWhere, parseProductListFilter } from './products';
+import {
+  buildProductListWhere,
+  MAX_PAGE_SIZE,
+  parsePagination,
+  parseProductListFilter,
+} from './products';
 
 const params = (qs: string) => new URLSearchParams(qs);
 
@@ -56,5 +61,24 @@ describe('buildProductListWhere', () => {
   it('남의 상점 상품이 섞이지 않도록 storeId 는 항상 남는다', () => {
     const where = buildProductListWhere('store-1', { q: '가방', categoryId: 'cat-1' });
     expect(where.storeId).toBe('store-1');
+  });
+});
+
+describe('parsePagination', () => {
+  it('아무것도 없으면 1페이지, 20개다', () => {
+    expect(parsePagination(params(''))).toEqual({ page: 1, pageSize: 20 });
+  });
+
+  it('page 와 pageSize 를 읽는다', () => {
+    expect(parsePagination(params('page=3&pageSize=10'))).toEqual({ page: 3, pageSize: 10 });
+  });
+
+  it('0·음수·소수·숫자가 아닌 값은 기본값으로 대체한다', () => {
+    expect(parsePagination(params('page=0&pageSize=-5'))).toEqual({ page: 1, pageSize: 20 });
+    expect(parsePagination(params('page=1.5&pageSize=abc'))).toEqual({ page: 1, pageSize: 20 });
+  });
+
+  it('pageSize 는 상한을 넘기지 못한다', () => {
+    expect(parsePagination(params('pageSize=100000')).pageSize).toBe(MAX_PAGE_SIZE);
   });
 });

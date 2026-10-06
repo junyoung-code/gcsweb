@@ -3,7 +3,11 @@ import { prisma } from '@/lib/db';
 import { apiError, apiErrors, apiSuccess } from '@/lib/api-response';
 import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
 import { getSellerContext } from '@/lib/seller/store';
-import { buildProductListWhere, parseProductListFilter } from '@/lib/seller/products';
+import {
+  buildProductListWhere,
+  parsePagination,
+  parseProductListFilter,
+} from '@/lib/seller/products';
 
 export const dynamic = 'force-dynamic';
 
@@ -135,22 +139,48 @@ async function findSoldProductIds(productIds: string[]): Promise<Set<string>> {
 /**
  * 내 상점의 상품 목록. 최신 등록 순.
  *
- * 쿼리: `q`(상품명 부분 일치), `categoryId`. 둘 다 선택이고 함께 쓰면 AND 로 걸린다.
- * 검색 결과가 없으면 빈 배열이다(디자인은 이때 "검색 결과가 없습니다."를 그린다).
+ * 쿼리: `q`(상품명 부분 일치), `categoryId`, `page`(기본 1), `pageSize`(기본 20, 최대 100).
+ * 필터는 함께 쓰면 AND 로 걸린다.
+ *
+ * 엠티뷰 구분: `totalCount`는 필터와 무관한 내 상점 전체 상품 수다.
+ * totalCount=0 이면 "아직 등록된 상품이 없습니다.", totalCount>0 인데 products 가 비면
+ * "검색 결과가 없습니다."를 그린다. `total`은 필터 적용 후 건수다.
  */
 export async function GET(request: Request) {
   try {
     const context = await getSellerContext();
     if (!context.ok) return apiErrors.unauthorized();
-    if (!context.store) return apiSuccess({ products: [] });
 
-    const filter = parseProductListFilter(new URL(request.url).searchParams);
+    const searchParams = new URL(request.url).searchParams;
+    const { page, pageSize } = parsePagination(searchParams);
 
-    const products = await prisma.onsiteProduct.findMany({
-      where: buildProductListWhere(context.store.storeId, filter),
-      select: PRODUCT_SELECT,
-      orderBy: { createdAt: 'desc' },
-    });
+    if (!context.store) {
+      return apiSuccess({
+        products: [],
+        page,
+        pageSize,
+        total: 0,
+        totalCount: 0,
+        hasNext: false,
+      });
+    }
+
+    const storeId = context.store.storeId;
+    const filter = parseProductListFilter(searchParams);
+    const where = buildProductListWhere(storeId, filter);
+
+    const [products, total, totalCount] = await Promise.all([
+      prisma.onsiteProduct.findMany({
+        where,
+        select: PRODUCT_SELECT,
+        // createdAt 이 같은 상품이 페이지 경계에서 중복·누락되지 않도록 productId 로 고정한다.
+        orderBy: [{ createdAt: 'desc' }, { productId: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.onsiteProduct.count({ where }),
+      prisma.onsiteProduct.count({ where: { storeId } }),
+    ]);
 
     const soldProductIds = await findSoldProductIds(
       products.map((product) => product.productId),
@@ -160,6 +190,11 @@ export async function GET(request: Request) {
       products: products.map((product) =>
         toResponse(product, soldProductIds.has(product.productId)),
       ),
+      page,
+      pageSize,
+      total,
+      totalCount,
+      hasNext: page * pageSize < total,
     });
   } catch (error) {
     console.error('[qrshop/products] GET error:', error);
