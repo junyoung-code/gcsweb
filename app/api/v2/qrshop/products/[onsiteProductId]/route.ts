@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiErrors, apiSuccess } from '@/lib/api-response';
+import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
 import { getSellerContext } from '@/lib/seller/store';
 
 export const dynamic = 'force-dynamic';
@@ -72,7 +73,7 @@ type ProductRow = {
   }>;
 };
 
-function toResponse(product: ProductRow) {
+function toResponse(product: ProductRow, hasSalesHistory: boolean) {
   return {
     id: product.productId,
     name: product.name,
@@ -89,8 +90,22 @@ function toResponse(product: ProductRow) {
       surcharge: option.surcharge,
       stock: option.currentStock,
     })),
+    /** 목록과 같은 모양을 유지한다. 빠지면 수정 직후 카드가 삭제 버튼을 잘못 띄운다. */
+    hasSalesHistory,
     createdAt: product.createdAt.toISOString(),
   };
+}
+
+/** 결제완료된 주문에 이 상품이 한 번이라도 들어갔는지. */
+async function hasPaidSale(productId: string) {
+  const line = await prisma.orderItem.findFirst({
+    where: {
+      onsiteProductId: productId,
+      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
+    },
+    select: { id: true },
+  });
+  return line !== null;
 }
 
 type RouteContext = { params: { onsiteProductId: string } };
@@ -165,7 +180,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       });
     });
 
-    return apiSuccess({ product: toResponse(updated) });
+    return apiSuccess({
+      product: toResponse(updated, await hasPaidSale(params.onsiteProductId)),
+    });
   } catch (error) {
     console.error('[qrshop/products/:id] PATCH error:', error);
     return apiErrors.serverError();

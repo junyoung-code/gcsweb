@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiError, apiErrors, apiSuccess } from '@/lib/api-response';
+import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
 import { getSellerContext } from '@/lib/seller/store';
+import { buildProductListWhere, parseProductListFilter } from '@/lib/seller/products';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +89,7 @@ type ProductRow = {
   }>;
 };
 
-function toResponse(product: ProductRow) {
+function toResponse(product: ProductRow, hasSalesHistory = false) {
   return {
     id: product.productId,
     name: product.name,
@@ -104,24 +106,61 @@ function toResponse(product: ProductRow) {
       surcharge: option.surcharge,
       stock: option.currentStock,
     })),
+    /** 「전체 상품」 카드가 삭제 버튼을 감추는 조건. 결제완료된 주문이 하나라도 있으면 true. */
+    hasSalesHistory,
     createdAt: product.createdAt.toISOString(),
   };
 }
 
-/** 내 상점의 상품 목록. 최신 등록 순. */
-export async function GET() {
+/** 결제완료 주문에 한 번이라도 팔린 상품 id 집합. 상품이 없으면 질의하지 않는다. */
+async function findSoldProductIds(productIds: string[]): Promise<Set<string>> {
+  if (productIds.length === 0) return new Set();
+
+  const lines = await prisma.orderItem.findMany({
+    where: {
+      onsiteProductId: { in: productIds },
+      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
+    },
+    select: { onsiteProductId: true },
+    distinct: ['onsiteProductId'],
+  });
+
+  return new Set(
+    lines
+      .map((line) => line.onsiteProductId)
+      .filter((id): id is string => id !== null),
+  );
+}
+
+/**
+ * 내 상점의 상품 목록. 최신 등록 순.
+ *
+ * 쿼리: `q`(상품명 부분 일치), `categoryId`. 둘 다 선택이고 함께 쓰면 AND 로 걸린다.
+ * 검색 결과가 없으면 빈 배열이다(디자인은 이때 "검색 결과가 없습니다."를 그린다).
+ */
+export async function GET(request: Request) {
   try {
     const context = await getSellerContext();
     if (!context.ok) return apiErrors.unauthorized();
     if (!context.store) return apiSuccess({ products: [] });
 
+    const filter = parseProductListFilter(new URL(request.url).searchParams);
+
     const products = await prisma.onsiteProduct.findMany({
-      where: { storeId: context.store.storeId },
+      where: buildProductListWhere(context.store.storeId, filter),
       select: PRODUCT_SELECT,
       orderBy: { createdAt: 'desc' },
     });
 
-    return apiSuccess({ products: products.map(toResponse) });
+    const soldProductIds = await findSoldProductIds(
+      products.map((product) => product.productId),
+    );
+
+    return apiSuccess({
+      products: products.map((product) =>
+        toResponse(product, soldProductIds.has(product.productId)),
+      ),
+    });
   } catch (error) {
     console.error('[qrshop/products] GET error:', error);
     return apiErrors.serverError();
