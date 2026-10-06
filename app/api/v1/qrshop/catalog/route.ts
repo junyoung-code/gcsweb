@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { apiError as jsonError } from '@/lib/api-response';
+import { getQrShopItemById } from '@/lib/qrshop/catalog';
 
 const QRSHOP_STORE_SLUG = 'nirvanaexpress';
 
@@ -19,6 +20,12 @@ type CatalogItem = {
  * item.json 기준 lib/qrshop/catalog.ts 를 거치므로, 카탈로그 소스만 DB로 옮기고
  * id 체계는 과도기적으로 유지한다. legacyQrItemId 가 없는 행(향후 관리자 CRUD로
  * 새로 만든 상품)은 아직 주문 흐름과 연결할 수 없어 응답에서 제외한다.
+ *
+ * 같은 이유로 legacyQrItemId 가 item.json 에 **없는** 행도 제외한다. DB 에는 지난
+ * 일차 옵션까지 남아 있는데(예: `bandana_a` 1일차 vs item.json `bandana_a_day4`),
+ * 주문 검증은 item.json 만 신뢰하므로 그대로 내보내면 메뉴에는 보이지만 결제 단계에서
+ * "판매하지 않는 상품이 포함되어 있습니다."(400 INVALID_CART)로 막힌다.
+ * 주문 금액 산정이 DB 로 완전히 넘어오면 이 필터는 걷어내면 된다.
  */
 export async function GET() {
   try {
@@ -33,7 +40,7 @@ export async function GET() {
       const categoryName = product.category?.name ?? '기타';
 
       if (!product.hasOption) {
-        if (!product.legacyQrItemId) return [];
+        if (!product.legacyQrItemId || !getQrShopItemById(product.legacyQrItemId)) return [];
         return [
           {
             id: product.legacyQrItemId,
@@ -46,7 +53,7 @@ export async function GET() {
       }
 
       return product.options.flatMap((option) => {
-        if (!option.legacyQrItemId) return [];
+        if (!option.legacyQrItemId || !getQrShopItemById(option.legacyQrItemId)) return [];
         return [
           {
             id: option.legacyQrItemId,
