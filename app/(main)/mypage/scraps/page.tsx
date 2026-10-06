@@ -5,9 +5,9 @@ import TabBar from '@/components/ui/button/TabBar';
 import EmptyviewText from '@/components/ui/common/EmptyviewText';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-type ScrapTab = 'Project' | 'Board' | 'Lounge';
+type ScrapTab = 'Project';
 
 interface ScrapProject {
   id: string;
@@ -18,23 +18,11 @@ interface ScrapProject {
   url?: string;
 }
 
-const TAB_ITEMS: Array<{ key: ScrapTab; title: string }> = [
-  { key: 'Project', title: 'PROJECT' },
-  { key: 'Board', title: 'BOARD' },
-  { key: 'Lounge', title: 'LOUNGE' },
-];
+const TAB_ITEMS: Array<{ key: ScrapTab; title: string }> = [{ key: 'Project', title: 'PROJECT' }];
 
-function getEndpoint(tab: ScrapTab): string {
-  if (tab === 'Board') return '/api/v1/mypage/scraps/post?category=0&page=1&size=50';
-  if (tab === 'Lounge') return '/api/v1/mypage/scraps/post?category=1&page=1&size=50';
-  return '/api/v1/mypage/scraps/project?page=1&size=50';
-}
+const SCRAP_ENDPOINT = '/api/v1/mypage/scraps/project?page=1&size=50';
 
-function getEmptyCta(tab: ScrapTab): { label: string; href: string } {
-  if (tab === 'Project') return { label: 'PROJECT 보러가기', href: '/archive' };
-  if (tab === 'Board') return { label: 'BOARD로 가기', href: '/community' };
-  return { label: 'LOUNGE로 가기', href: '/community' };
-}
+const EMPTY_CTA = { label: 'PROJECT 보러가기', href: '/archive' };
 
 function ProjectCard({ item }: { item: ScrapProject }) {
   const linkUrl = item.url ?? `/projects/${item.id}`;
@@ -98,7 +86,7 @@ export default function MypageScrapsPage() {
     const fetchScraps = async () => {
       setLoading(true);
       try {
-        const res = await fetch(getEndpoint(activeTab));
+        const res = await fetch(SCRAP_ENDPOINT);
         if (!res.ok) throw new Error('fetch failed');
         const json = await res.json();
         const data: ScrapProject[] = json?.data?.projects ?? [];
@@ -113,7 +101,7 @@ export default function MypageScrapsPage() {
     fetchScraps();
   }, [activeTab]);
 
-  const cta = useMemo(() => getEmptyCta(activeTab), [activeTab]);
+  const cta = EMPTY_CTA;
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-[#f6f6f5]">

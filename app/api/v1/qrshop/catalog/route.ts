@@ -33,7 +33,7 @@ export async function GET() {
       const categoryName = product.category?.name ?? '기타';
 
       if (!product.hasOption) {
-        if (!product.legacyQrItemId || product.price === null) return [];
+        if (!product.legacyQrItemId) return [];
         return [
           {
             id: product.legacyQrItemId,
@@ -54,7 +54,8 @@ export async function GET() {
             categoryName,
             name: product.name,
             option: option.name,
-            price: option.price,
+            // 옵션 금액은 절대가격이 아니라 기본가에 더하는 추가금이다.
+            price: product.price + option.surcharge,
           },
         ];
       });

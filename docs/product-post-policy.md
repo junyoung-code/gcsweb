@@ -1,86 +1,82 @@
-# 상품글 정책 (최종본)
+# 상품글 정책
+
+> 2026-09-09 백엔드 회의 결정 반영.
+> 이전 판은 `ProductUpdateRequest` 기반 승인 플로우를 기술하고 있었으나,
+> 해당 테이블들은 `20260817000000_remove_product_requests_and_rename_project_year`
+> 마이그레이션에서 삭제되었다.
 
 ## A. 테이블 역할 정의
 
-### 1) Product (운영본)
-- 관리자 승인 후 데이터
-- Shop/내등록상품/상품글관리 상품목록에 노출되는 데이터
-- 구성 테이블
-  - `Product`: 운영본 상품정보
-  - `ProductImage`: 운영본 이미지
-  - `ProductOption`: 운영본 옵션
-  - `ProductOptionValue`: 운영본 옵션값
+### Product (단일 운영본)
 
-### 2) ProductUpdateRequest (요청본)
-- 관리자 승인 전 데이터
-- 판매자가 보낸 요청 데이터
-- 상품글관리 등록요청/수정요청 목록에 노출되는 데이터
-- 구성 테이블
-  - `ProductUpdateRequest`: 요청본 상품정보
-  - `ProductUpdateRequestImage`: 요청본 이미지
-  - `ProductUpdateRequestOption`: 요청본 옵션
-  - `ProductUpdateRequestOptionValue`: 요청본 옵션값
+승인 대기용 요청본 테이블은 없다. 판매자가 등록하면 곧바로 운영본이 된다.
 
-## B. 노출 기준
+- `Product`: 상품정보
+- `ProductImage`: 이미지
+- `ProductOption` / `ProductOptionValue`: 옵션
+- `ProductVariant`: 옵션 조합
 
-- 내가등록한상품 상품목록: `Product` (운영본)
-- 상품글관리 상품목록: `Product` (운영본)
-  - `isAdminApproved = true`
-- Shop 상품목록: `Product` (운영본)
-  - `isAdminApproved = true` AND `isPublic = true`
-- Home 상품목록: `Product` (운영본)
-  - `isAdminApproved = true` AND `isPublic = true` AND `isHome = true`
-- 상품글관리 등록요청 상품목록: `ProductUpdateRequest` (요청본)
-- 상품글관리 수정요청 상품목록: `ProductUpdateRequest` (요청본)
+## B. 상품 유형 (`Product.type`)
 
-## C. 등록 요청 플로우
+Prisma enum이 아니라 `Int`이며, 값의 의미는 `lib/product-type.ts`에서 정의한다.
 
-### 1) 판매자 등록 요청 시
-- `ProductUpdateRequest` 관련 4개 테이블 생성
-- `ProductUpdateRequestImage.noticeImgUrl = null` 이어야 함
-- `Product` 상태 기본값
-  - `isAdminApproved = false`
-  - `isPublic = false`
-  - `isHome = false`
+| 값 | 유형 | 신규 등록·수정 |
+|---|---|---|
+| 0 | Fund | **불가** |
+| 1 | Buy Now | 가능 |
+| 2 | Partner Up | **불가** |
 
-### 2) 관리자 승인 전
-- 내등록상품은 `Product`만 보이므로, 요청 데이터는 승인 전까지 노출되지 않음
-- 상품글관리 등록요청목록에는 요청본(`ProductUpdateRequest`) 표시
+Fund와 Partner Up은 3차개발 「gcsweb에서 없어질 것」 리스트에 따라 비활성화되었다.
+등록·수정 API는 이 두 값을 `INVALID_INPUT`(400)으로 거부한다.
+**이미 등록된 Fund/Partner Up 상품의 조회 경로는 막지 않는다.** 다만 수정도 함께
+막히므로, 기존 값 유지가 필요해지면 `ALL_PRODUCT_TYPES`를 쓰면 된다.
 
-### 3) 관리자 승인 시
-- 고시이미지(필수값) 입력 + 필요시 요청본(`ProductUpdateRequest`) 수정
-- 승인 결과를 요청본에 반영 
-- 요청본을 `Product`에 반영 (+Image, Option, OptionValue, Variant)
-- 처리 완료된 요청본은 삭제
+## C. 노출 기준
 
-### 4) 관리자 거부 시
-- 요청본 row 삭제
+| 화면 | 조건 |
+|---|---|
+| 내가등록한상품 | `isAdminApproved = true` |
+| 상품글관리(관리자) | `isAdminApproved = true` |
+| Shop | `isAdminApproved = true` AND `isPublic = true` |
+| Home | `isAdminApproved = true` AND `isPublic = true` AND `isHome = true` |
 
-## D. 수정 요청 플로우
+`isAdminApproved`는 조회 게이트로만 남아 있고, 승인 대기 상태를 만들지는 않는다.
+아래 D 참고.
 
-### 1) 판매자 수정 요청 시
-- `Product`는 그대로 유지
-- 수정안은 `ProductUpdateRequest` 관련 4개 테이블에 저장
-- 수정요청 payload의 `ProductUpdateRequestImage.noticeImgUrl`은 `null` 불가
-  - 판매자 화면에는 기존 등록된 상품고시정보이미지가 보여야 함
-  - 판매자는 기존 고시이미지를 유지하거나 새 이미지로 교체 가능
+## D. 등록 / 수정 플로우
 
-### 2) 관리자 승인 전
-- Shop/내등록상품/상품글관리 상품목록은 기존 `Product` 그대로 표시
-- 상품글관리 수정요청목록에는 요청본(`ProductUpdateRequest`) 표시
+### 판매자 등록 (`POST /api/v1/mypage/products`)
 
-### 3) 관리자 승인 시
-- 승인 결과를 요청본에 반영
-- 요청본을 `Product`에 반영 (+Image, Option, OptionValue, Variant)
-- 처리 완료된 요청본은 삭제
+`isAdminApproved = true`, `isPublic = true`, `isHome = false`로 즉시 생성된다.
+별도 승인 절차 없이 바로 Shop에 노출된다.
 
-### 4) 관리자 거부 시
-- `Product` 변경 없음
-- 요청본 row 삭제
+3차개발 「없어질 것」 리스트의 *"상품글 관리자 승인 방식 (→ 판매팀이 올리면 그대로
+shop에 노출되는 구조로)"* 에 해당한다. 즉 **승인 흐름이 동작하지 않는 것은 의도된
+상태**이며, 되살리는 것이 아니라 걷어내는 방향이다.
 
-## E. 요청본 개수 정책 (중요)
+`isAdminApproved` 컬럼 자체는 아직 남아 있다.
 
-- 하나의 `Product`당 `ProductUpdateRequest`는 항상 `0`개 또는 `1`개만 유지
-- 이미 요청본이 있는 상태에서 같은 상품의 새 수정요청이 들어오면,
-  - 기존 요청본을 삭제하지 않고
-  - 기존 요청본 데이터를 새 요청 데이터로 overwrite
+### 판매자 수정 (`PUT /api/v1/mypage/products/{productId}`)
+
+`Product`를 직접 수정한다. 요청본을 거치지 않는다.
+
+### 관리자
+
+| 라우트 | 역할 |
+|---|---|
+| `GET /api/v1/admin/product/list` | 상품 목록 |
+| `PATCH /api/v1/admin/product/{id}` | `isPublic` / `isHome` 토글 (노출 제어) |
+| `GET`·`PATCH /api/v1/admin/product/update/{id}` | 관리자 직접 수정 |
+
+`isPublic`을 `true`로 바꿀 때 `publicAt`이 기록되고, `false`로 되돌리면 `null`이 된다.
+
+**등록요청 / 수정요청 목록 화면은 없다.** 관리자 상품 목록 헤더에 있던
+`등록 N | 수정 N` 박스는 제거되었다. 가리키던 페이지가 이미 존재하지 않았고,
+`수정` 카운트는 상수 `0`이었다.
+
+## E. 검증 규칙
+
+- 상품명: 13자 이내 (`PRODUCT_NAME_MAX_LENGTH`)
+- Buy Now는 현장 수령(`receiveMethod = 1`)만 가능
+- 등록·수정 시 `type`은 `lib/product-type.ts`의 `isSelectableProductType`을 통과해야 함
+  - 프론트(zod)와 API 라우트가 같은 함수를 쓴다. 허용 목록을 바꿀 때 이 파일만 고치면 된다.

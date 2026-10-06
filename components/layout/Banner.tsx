@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 
 interface BannerProps {
   className?: string;
-  variant?: 'archive' | 'shop' | 'about' | 'community';
+  variant?: 'archive' | 'shop' | 'about';
 }
 
 export default function Banner({ className, variant = 'archive' }: BannerProps) {
@@ -11,7 +11,6 @@ export default function Banner({ className, variant = 'archive' }: BannerProps) 
     archive: '/assets/images/banner-archive.svg',
     shop: '/assets/images/banner-shop.svg',
     about: '/assets/images/banner-about.svg',
-    community: '/assets/images/banner-community.svg',
   };
   const src = srcMap[variant];
 

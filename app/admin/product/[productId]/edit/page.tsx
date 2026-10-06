@@ -11,6 +11,7 @@ import DateRangeInput from '@/components/ui/admin/product/DateRangeInput';
 import ProductImage from '@/components/ui/admin/product/Image';
 import OptionName from '@/components/ui/admin/product/OptionName';
 import OptionVariation from '@/components/ui/admin/product/OptionVariation';
+import { PRODUCT_TYPE_OPTIONS, isDisabledProductType } from '@/lib/product-type';
 
 type ProductType = 0 | 1 | 2;
 type ReceiveMethod = 0 | 1 | null;
@@ -763,7 +764,15 @@ export default function AdminProductEditPage() {
                   <p className="typo-body-small-bold text-neutral-10">{KR.productType}</p>
                   <span className="typo-body-xsmall-bold text-danger">*</span>
                 </div>
-                <Radiocardgroup className="w-full" options={['Fund', 'Buy Now', 'Partner Up']} selectedIndex={type === 0 ? 0 : type === 1 ? 1 : 2} onSelect={onTypeSelect} />
+                <Radiocardgroup
+                  className="w-full"
+                  options={PRODUCT_TYPE_OPTIONS.map((opt) => opt.label)}
+                  optionStatuses={PRODUCT_TYPE_OPTIONS.map((opt) =>
+                    isDisabledProductType(opt.value) ? 'disabled' : 'default'
+                  )}
+                  selectedIndex={type === 0 ? 0 : type === 1 ? 1 : 2}
+                  onSelect={onTypeSelect}
+                />
               </section>
 
               <section className="space-y-2">

@@ -9,6 +9,7 @@ import {
   newProductStep2PickupSchema,
   PRODUCT_NAME_MAX_LENGTH,
 } from '@/lib/validations/product';
+import { PRODUCT_TYPE_OPTIONS, isDisabledProductType } from '@/lib/product-type';
 import { cn } from '@/lib/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format, parseISO } from 'date-fns';
@@ -798,31 +799,33 @@ export default function NewProductPage() {
               control={control}
               render={({ field }) => (
                 <div className="mt-2 overflow-hidden rounded-lg border border-neutral-5 bg-neutral-1">
-                  {[
-                    { value: 0, label: 'Fund' },
-                    { value: 1, label: 'Buy Now' },
-                    { value: 2, label: 'Partner Up' },
-                  ].map((opt, i) => (
-                    <div
-                      key={opt.value}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => field.onChange(opt.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && field.onChange(opt.value)}
-                      className={cn(
-                        'flex cursor-pointer items-center px-4 py-3',
-                        i > 0 && 'border-t border-neutral-4'
-                      )}
-                    >
-                      <RadioButton
-                        checked={field.value === opt.value}
-                        onChange={() => field.onChange(opt.value)}
-                        label={opt.label}
-                        value={opt.value}
-                        className="w-full"
-                      />
-                    </div>
-                  ))}
+                  {PRODUCT_TYPE_OPTIONS.map((opt, i) => {
+                    const disabled = isDisabledProductType(opt.value);
+                    return (
+                      <div
+                        key={opt.value}
+                        role="button"
+                        tabIndex={disabled ? -1 : 0}
+                        aria-disabled={disabled}
+                        onClick={disabled ? undefined : () => field.onChange(opt.value)}
+                        onKeyDown={(e) => !disabled && e.key === 'Enter' && field.onChange(opt.value)}
+                        className={cn(
+                          'flex items-center px-4 py-3',
+                          disabled ? 'cursor-not-allowed bg-neutral-3 opacity-50' : 'cursor-pointer',
+                          i > 0 && 'border-t border-neutral-4'
+                        )}
+                      >
+                        <RadioButton
+                          checked={field.value === opt.value}
+                          onChange={disabled ? undefined : () => field.onChange(opt.value)}
+                          disabled={disabled}
+                          label={opt.label}
+                          value={opt.value}
+                          className="w-full"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             />

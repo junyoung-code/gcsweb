@@ -9,7 +9,6 @@ type BottomTabBarVariant =
   | 'archive'
   | 'home'
   | 'shop'
-  | 'community'
   | 'shop_fund'
   | 'shop_buynow_partnerup';
 
@@ -19,7 +18,6 @@ interface BottomTabBarProps {
   archiveHref?: string;
   homeHref?: string;
   shopHref?: string;
-  communityHref?: string;
   onOrder?: () => void;
 }
 
@@ -59,10 +57,6 @@ function BagIcon({ active = false }: { active?: boolean }) {
   return <MaskIcon src="/assets/icons/light/bag-2.svg" colorClassName={active ? 'text-orange-5' : 'text-neutral-7'} />;
 }
 
-function UsersIcon({ active = false }: { active?: boolean }) {
-  return <MaskIcon src="/assets/icons/light/users.svg" colorClassName={active ? 'text-orange-5' : 'text-neutral-7'} />;
-}
-
 function HeartIcon() {
   return <MaskIcon src="/assets/icons/light/heart.svg" colorClassName="text-neutral-6" />;
 }
@@ -94,7 +88,6 @@ export default function BottomTabBar({
   archiveHref = '/archive',
   homeHref = '/',
   shopHref = '/shop',
-  communityHref = '/community',
   onOrder,
 }: BottomTabBarProps) {
   if (variant === 'shop_fund' || variant === 'shop_buynow_partnerup') {
@@ -124,7 +117,6 @@ export default function BottomTabBar({
         <TabItem href={archiveHref} label="Archive" active={variant === 'archive'} icon={<LayersIcon active={variant === 'archive'} />} widthClassName="w-[39px]" />
         <TabItem href={homeHref} label="Home" active={variant === 'home'} icon={<HomeIcon active={variant === 'home'} />} widthClassName="w-[30px]" />
         <TabItem href={shopHref} label="Shop" active={variant === 'shop'} icon={<BagIcon active={variant === 'shop'} />} widthClassName="w-[26px]" />
-        <TabItem href={communityHref} label="Community" active={variant === 'community'} icon={<UsersIcon active={variant === 'community'} />} widthClassName="w-[57px]" />
       </div>
     </div>
   );
