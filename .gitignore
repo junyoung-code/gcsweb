@@ -42,9 +42,6 @@ next-env.d.ts
 /public/uploads/
 
 # mcp config (local server settings)
-.vscode/mcp.json
-.cursor/mcp.json
-
 .agents/rules/commit-convention.md
 .agents/mcp_config.json
 CLAUDE.md
