@@ -8,6 +8,7 @@ import Button from '@/components/ui/button/Button';
 import CheckboxButton from '@/components/ui/button/CheckboxButton';
 import Dropdown from '@/components/ui/button/Dropdown';
 import { formatPrice } from '@/lib/utils';
+import { ORDER_PAYMENT_METHOD } from '@/lib/order-status';
 
 type CartApiItem = {
   cartItemId: string;
@@ -250,7 +251,7 @@ function ShopOrdersPickupPageContent() {
         receiverPhone: receiverPhone.trim(),
         ordererName: receiverName.trim(),
         ordererPhone: receiverPhone.trim(),
-        paymentMethod,
+        paymentMethod: ORDER_PAYMENT_METHOD.ONLINE, // 카드/계좌 구분은 cardCompany|bankCode
         cardCompany: paymentMethod === 0 ? cardCompany : null,
         bankCode: paymentMethod === 1 ? bankCode : null,
         easyPayProvider: null,

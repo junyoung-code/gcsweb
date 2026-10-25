@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { ORDER_PAYMENT_METHOD } from '@/lib/order-status';
 
 const ProductTypeSchema = z.union([z.literal(0), z.literal(1)]); // fund | buy now
 const ReceiveMethodSchema = z.union([z.literal(0), z.literal(1)]); // delivery | pickup
-const PaymentMethodSchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]); // card | virtual account | easy pay | pay at counter
+const PaymentMethodSchema = z.union([z.literal(ORDER_PAYMENT_METHOD.ONLINE), z.literal(ORDER_PAYMENT_METHOD.ON_SITE)]); // online | on-site (세부 PG 수단은 PortOne 결제창에서 선택)
 const BagOptionSchema = z.boolean();
 const CardCompanySchema = z.union([
   z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4),
@@ -101,7 +102,7 @@ export const createOrderSchema = z
       }
     }
 
-    if (isFund && (data.paymentMethod === 2 || data.paymentMethod === 3)) {
+    if (isFund && data.paymentMethod !== ORDER_PAYMENT_METHOD.ONLINE) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['paymentMethod'],
@@ -128,15 +129,18 @@ export const createOrderSchema = z
       }
     }
 
-    if (isFund && data.paymentMethod === 0) {
-      if (data.cardCompany === null || data.cardCompany === undefined) {
+    // fund: 결제방법은 온라인 하나이고, 카드/계좌 선택은 세부 컬럼(cardCompany | bankCode)으로 구분한다.
+    if (isFund && data.paymentMethod === ORDER_PAYMENT_METHOD.ONLINE) {
+      const hasCard = data.cardCompany !== null && data.cardCompany !== undefined;
+      const hasBank = data.bankCode !== null && data.bankCode !== undefined;
+      if (!hasCard && !hasBank) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['cardCompany'],
           message: 'INVALID_CARD_COMPANY',
         });
       }
-      if (data.bankCode !== null && data.bankCode !== undefined) {
+      if (hasCard && hasBank) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['bankCode'],
@@ -152,55 +156,7 @@ export const createOrderSchema = z
       }
     }
 
-    if (isFund && data.paymentMethod === 1) {
-      if (data.bankCode === null || data.bankCode === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['bankCode'],
-          message: 'INVALID_BANK_CODE',
-        });
-      }
-      if (data.cardCompany !== null && data.cardCompany !== undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['cardCompany'],
-          message: 'INVALID_PAYMENT_DETAIL_COMBINATION',
-        });
-      }
-      if (data.easyPayProvider !== null && data.easyPayProvider !== undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['easyPayProvider'],
-          message: 'INVALID_PAYMENT_DETAIL_COMBINATION',
-        });
-      }
-    }
-
-    if (isFund && data.paymentMethod === 2) {
-      if (data.easyPayProvider === null || data.easyPayProvider === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['easyPayProvider'],
-          message: 'INVALID_EASY_PAY_PROVIDER',
-        });
-      }
-      if (data.cardCompany !== null && data.cardCompany !== undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['cardCompany'],
-          message: 'INVALID_PAYMENT_DETAIL_COMBINATION',
-        });
-      }
-      if (data.bankCode !== null && data.bankCode !== undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['bankCode'],
-          message: 'INVALID_PAYMENT_DETAIL_COMBINATION',
-        });
-      }
-    }
-
-    if (data.paymentMethod === 3) {
+    if (data.paymentMethod === ORDER_PAYMENT_METHOD.ON_SITE) {
       if (!isBuyNow) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -229,14 +185,6 @@ export const createOrderSchema = z
           message: 'INVALID_PAYMENT_DETAIL_COMBINATION',
         });
       }
-    }
-
-    if (isBuyNow && data.paymentMethod !== 0 && data.paymentMethod !== 3) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['paymentMethod'],
-        message: 'INVALID_PAYMENT_METHOD',
-      });
     }
 
     if (isBuyNow) {

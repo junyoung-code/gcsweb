@@ -1,5 +1,5 @@
 import type { Prisma } from '@prisma/client';
-import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
+import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 import { prisma } from '@/lib/db';
 
 type Client = Pick<Prisma.TransactionClient, 'orderItem'>;
@@ -9,7 +9,7 @@ type Client = Pick<Prisma.TransactionClient, 'orderItem'>;
  * OrderItem.onsiteProductId가 채워진 주문만 잡히므로, 주문 로직이 DB 기반으로 전환되기 전의
  * 주문(매핑 없음)은 누락될 수 있다.
  */
-const paidOrder = { paymentStatus: ONSITE_PAYMENT_STATUS.PAID } as const;
+const paidOrder = { paymentStatus: ORDER_PAYMENT_STATUS.PAID } as const;
 
 /** 결제완료된 주문에 이 상품이 한 번이라도 들어갔는지. */
 export async function hasProductPaidSale(productId: string, client: Client = prisma): Promise<boolean> {

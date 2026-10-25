@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { chargeWithBillingKey } from '@/lib/payment/portone';
 import { apiError as jsonError } from '@/lib/api-response';
+import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 
 type Params = { params: { orderId: string } };
 
@@ -23,7 +24,7 @@ export async function POST(request: Request, { params }: Params) {
       where: {
         id: orderId,
         productType: 0,
-        paymentStatus: 0,
+        paymentStatus: ORDER_PAYMENT_STATUS.PENDING,
       },
       select: {
         id: true,
@@ -68,7 +69,7 @@ export async function POST(request: Request, { params }: Params) {
     await prisma.order.update({
       where: { id: orderId },
       data: {
-        paymentStatus: 1,
+        paymentStatus: ORDER_PAYMENT_STATUS.PAID,
         impUid: result.impUid,
       },
     });

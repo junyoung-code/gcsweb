@@ -26,7 +26,7 @@ export async function GET() {
       categories: categories.map((row) => ({ id: row.categoryId, name: row.name })),
     });
   } catch (error) {
-    console.error('[seller/categories] GET error:', error);
+    console.error('[qrshop/categories] GET error:', error);
     return apiErrors.serverError();
   }
 }
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
     return apiSuccess({ category: { id: category.categoryId, name: category.name } });
   } catch (error) {
-    console.error('[seller/categories] POST error:', error);
+    console.error('[qrshop/categories] POST error:', error);
     return apiErrors.serverError();
   }
 }

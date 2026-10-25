@@ -9,14 +9,20 @@ import Modal from '@/components/ui/common/Modal';
 import Pagination from '@/components/ui/common/Pagination';
 import SearchBar from '@/components/ui/common/SearchBar';
 import { Matrix_Attribute_06, Matrix_Contents_06, PcTableRow_Buynow } from '@/components/ui/admin/onsite';
+import {
+  ORDER_PAYMENT_STATUS,
+  ORDER_RECEIPT_STATUS,
+  type PaymentStatus,
+  type ReceiptStatus,
+} from '@/lib/order-status';
 
 const PAGE_SIZE = 20;
 
 type ReceiptItem = {
   id: string;
   productType: number;
-  paymentStatusCode: number;
-  fulfillmentStatusCode: number;
+  paymentStatusCode: PaymentStatus;
+  receiptStatusCode: ReceiptStatus;
   orderId: string;
   orderTime: string;
   fullOrderTime: string;
@@ -156,15 +162,18 @@ export default function AdminOnsitePage() {
   }, [page, totalPages]);
 
   const handleToggleReceipt = async (item: ReceiptItem) => {
-    if (updatingReceiptId === item.id || item.paymentStatusCode === 3) return;
+    if (updatingReceiptId === item.id || item.paymentStatusCode === ORDER_PAYMENT_STATUS.CANCELED) return;
 
     try {
       setUpdatingReceiptId(item.id);
-      const nextFulfillmentStatus = item.fulfillmentStatusCode === 1 ? 0 : 1;
+      const nextReceiptStatus =
+        item.receiptStatusCode === ORDER_RECEIPT_STATUS.RECEIVED
+          ? ORDER_RECEIPT_STATUS.NOT_RECEIVED
+          : ORDER_RECEIPT_STATUS.RECEIVED;
       const res = await fetch(`/api/v1/admin/onsite/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fulfillmentStatus: nextFulfillmentStatus }),
+        body: JSON.stringify({ receiptStatus: nextReceiptStatus }),
       });
 
       const json = await res.json();
@@ -183,14 +192,14 @@ export default function AdminOnsitePage() {
   };
 
   const handleCancelOrder = async (item: ReceiptItem) => {
-    if (updatingCancelId === item.id || item.paymentStatusCode === 3) return false;
+    if (updatingCancelId === item.id || item.paymentStatusCode === ORDER_PAYMENT_STATUS.CANCELED) return false;
 
     try {
       setUpdatingCancelId(item.id);
       const res = await fetch(`/api/v1/admin/onsite/${item.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentStatus: 3 }),
+        body: JSON.stringify({ paymentStatus: ORDER_PAYMENT_STATUS.CANCELED }),
       });
 
       const json = await res.json();
@@ -211,7 +220,7 @@ export default function AdminOnsitePage() {
   };
 
   const openCancelModal = (item: ReceiptItem) => {
-    if (updatingCancelId === item.id || item.paymentStatusCode === 3) return;
+    if (updatingCancelId === item.id || item.paymentStatusCode === ORDER_PAYMENT_STATUS.CANCELED) return;
     setPendingCancelItem(item);
   };
 
@@ -482,7 +491,7 @@ export default function AdminOnsitePage() {
 
                   <div className="flex flex-col gap-4">
                     {group.items.map((item, index) => {
-                    const isCanceled = item.paymentStatusCode === 3;
+                    const isCanceled = item.paymentStatusCode === ORDER_PAYMENT_STATUS.CANCELED;
                     const isReceiptUpdating = updatingReceiptId === item.id;
                     const isCancelUpdating = updatingCancelId === item.id;
                     const hasBagNotice = Boolean(item.requiresBagPackaging || item.bagOption);
@@ -494,7 +503,7 @@ export default function AdminOnsitePage() {
                           ? '봉투'
                           : item.items.length >= 2
                             ? 'multiple'
-                            : item.fulfillmentStatusCode === 1
+                            : item.receiptStatusCode === ORDER_RECEIPT_STATUS.RECEIVED
                               ? '수령완료'
                               : '미수령';
 

@@ -3,10 +3,16 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/admin-auth';
 import { formatDateTimePartsInSeoul } from '@/lib/datetime';
 import {
-  ONSITE_ADMIN_PAYMENT_COMPLETED_LABEL,
-  toOnsitePaymentStatusLabel,
-  toOnsiteReceiptStatusLabel,
-} from '@/lib/admin-onsite-status';
+  ORDER_ADMIN_PAYMENT_COMPLETED_LABEL,
+  ORDER_PAYMENT_METHOD,
+  ORDER_PAYMENT_STATUSES,
+  isOnSitePaymentMethod,
+  type PaymentMethod,
+  type PaymentStatus,
+  type ReceiptStatus,
+  toOrderPaymentStatusLabel,
+  toOrderReceiptStatusLabel,
+} from '@/lib/order-status';
 import { apiError as jsonError } from '@/lib/api-response';
 
 export const dynamic = 'force-dynamic';
@@ -28,8 +34,8 @@ type MappedOrderItem = {
 type MappedOrder = {
   id: string;
   productType: number;
-  paymentStatusCode: number;
-  fulfillmentStatusCode: number;
+  paymentStatusCode: PaymentStatus;
+  receiptStatusCode: ReceiptStatus;
   orderId: string;
   orderTime: string;
   fullOrderTime: string;
@@ -137,9 +143,8 @@ function mapOnsiteOrderItem(item: any): MappedOrderItem {
   };
 }
 
-function toPaymentMethodLabel(paymentMethod: number) {
-  if (paymentMethod === 3) return '현장결제';
-  return '온라인결제';
+function toPaymentMethodLabel(paymentMethod: PaymentMethod) {
+  return isOnSitePaymentMethod(paymentMethod) ? '현장결제' : '온라인결제';
 }
 
 export async function GET(req: Request) {
@@ -165,13 +170,13 @@ export async function GET(req: Request) {
     const where: any = {
       productType: 1,
       receiveMethod: 1,
-      paymentStatus: { in: [0, 1, 2, 3, 4] },
+      paymentStatus: { in: [...ORDER_PAYMENT_STATUSES] },
     };
 
     if (payMethod === 'online') {
-      where.paymentMethod = { not: 3 };
+      where.paymentMethod = ORDER_PAYMENT_METHOD.ONLINE;
     } else if (payMethod === 'counter') {
-      where.paymentMethod = 3;
+      where.paymentMethod = ORDER_PAYMENT_METHOD.ON_SITE;
     }
 
     if (search) {
@@ -203,20 +208,19 @@ export async function GET(req: Request) {
       const HH = hour;
       const mm = minute;
 
-      const paymentStatusCode = Number(order.paymentStatus ?? 0);
-      const fulfillmentStatusCode = Number(order.fulfillmentStatus ?? 0);
-      const paymentMethodCode = Number(order.paymentMethod ?? 0);
+      const paymentStatusCode: PaymentStatus = order.paymentStatus;
+      const receiptStatusCode: ReceiptStatus = order.receiptStatus;
+      const paymentMethodCode: PaymentMethod = order.paymentMethod;
 
       const orderDate =
         order.orderDate instanceof Date ? order.orderDate : new Date(order.orderDate as string);
 
-      const paymentStatus = toOnsitePaymentStatusLabel({
+      const paymentStatus = toOrderPaymentStatusLabel({
         paymentMethod: paymentMethodCode,
         paymentStatus: paymentStatusCode,
-        fulfillmentStatus: fulfillmentStatusCode,
         orderDate,
       });
-      const receiptStatus = toOnsiteReceiptStatusLabel(fulfillmentStatusCode);
+      const receiptStatus = toOrderReceiptStatusLabel(receiptStatusCode);
 
       const items: MappedOrderItem[] = Array.isArray(order.items)
         ? order.items.map((item: any) => mapOnsiteOrderItem(item))
@@ -230,7 +234,7 @@ export async function GET(req: Request) {
         id: String(order.id),
         productType: Number(order.productType ?? 1),
         paymentStatusCode,
-        fulfillmentStatusCode,
+        receiptStatusCode,
         orderId: String(order.orderCode ?? String(order.id ?? '').slice(-10).toUpperCase()),
         orderTime: `${HH}:${mm}`,
         fullOrderTime: `${YY}.${MM}.${DD} ${HH}:${mm}`,
@@ -256,8 +260,8 @@ export async function GET(req: Request) {
     });
 
     const outcomeFilteredData = sourceFilteredData.filter((row) => {
-      if (payOutcome === 'completed') return row.paymentStatus === ONSITE_ADMIN_PAYMENT_COMPLETED_LABEL;
-      if (payOutcome === 'other') return row.paymentStatus !== ONSITE_ADMIN_PAYMENT_COMPLETED_LABEL;
+      if (payOutcome === 'completed') return row.paymentStatus === ORDER_ADMIN_PAYMENT_COMPLETED_LABEL;
+      if (payOutcome === 'other') return row.paymentStatus !== ORDER_ADMIN_PAYMENT_COMPLETED_LABEL;
       return true;
     });
 

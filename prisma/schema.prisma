@@ -182,9 +182,9 @@ model Order {
   deliveryMessage       String?
   ordererName           String?
   ordererPhone          String?
-  paymentStatus         Int         @default(0)
-  fulfillmentStatus     Int?
-  paymentMethod         Int
+  paymentStatus         PaymentStatus @default(PENDING) /// 결제상태 (수령상태와 별개 축)
+  receiptStatus         ReceiptStatus @default(NOT_RECEIVED) /// 수령상태 (결제상태와 연동하지 않음)
+  paymentMethod         PaymentMethod /// 결제방법 (세부 PG 수단은 사이트가 나누지 않음)
   cardCompany           Int?
   bankCode              Int?
   easyPayProvider       Int?
@@ -204,7 +204,7 @@ model Order {
   @@index([userId])
   @@index([productType, receiveMethod])
   @@index([paymentStatus])
-  @@index([fulfillmentStatus])
+  @@index([receiptStatus])
   @@index([orderDate])
   @@index([orderDateKey, productType])
   @@index([bankCode])
@@ -262,11 +262,10 @@ model FairShopProduct {
 /// QRshop 상점
 model Store {
   storeId   String  @id @default(cuid())
-  userId    String? @unique /// 상점 소유자. 1인 1상점이므로 unique. 판매이력이 있는 상점은 소유자(User)가 삭제돼도 null로 남는다(SetNull)
+  userId    String? @unique /// 1인 1상점이므로 unique. 소유자(User)가 삭제되도 판매이력이 있는 상점은 삭제되지 않음 (userId null로 유지, SetNull)
   name      String  @db.VarChar(16)
   storeSlug String  @unique         // 상점URL 식별자
   imageUrl  String? /// 상점 프로필 이미지
-
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
   user       User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -311,7 +310,7 @@ model OnsiteProduct {
   @@index([categoryId])
 }
 
-/// QRshop 상품 옵션. 상품이 hasOption=true 일 때만 사용된다.
+/// QRshop 상품 옵션. 상품이 hasOption=true 일 때만 사용
 model OnsiteProductOption {
   optionId       String        @id @default(cuid())
   productId      String
@@ -517,4 +516,21 @@ enum SignupMethod {
 enum BuyerType {
   USER
   GUEST
+}
+
+enum PaymentStatus {
+  PENDING /// 대기
+  PAID /// 완료
+  CANCELED /// 취소
+  FAILED /// 실패
+}
+
+enum PaymentMethod {
+  ONLINE /// 온라인결제
+  ON_SITE /// 현장결제
+}
+
+enum ReceiptStatus {
+  NOT_RECEIVED /// 미수령
+  RECEIVED /// 수령완료
 }

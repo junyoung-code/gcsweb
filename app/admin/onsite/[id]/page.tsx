@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { NavBar } from '@/components/layout';
 
-type FulfillmentStatus = 'RECEIVED' | 'NOT_RECEIVED' | string;
+type ReceiptStatus = 'RECEIVED' | 'NOT_RECEIVED';
 
 type OrderItem = {
   id: string;
@@ -21,7 +21,7 @@ type OrderDetail = {
   impUid: string;
   orderDate: string;
   isCanceled: boolean;
-  paymentStatus: number;
+  paymentStatus: string;
   bagOption?: boolean;
   requiresBagPackaging?: boolean;
   bagNoticeMessage?: string | null;
@@ -30,7 +30,7 @@ type OrderDetail = {
     method: string;
     amount: string;
   };
-  fulfillmentStatus: FulfillmentStatus;
+  receiptStatus: ReceiptStatus;
   actionButtonState?: 'CANCELED' | 'RECEIVED' | 'NOT_RECEIVED';
 };
 
@@ -113,7 +113,7 @@ export default function AdminOnsiteDetailPage({ params }: { params: { id: string
     }
   };
 
-  const updateStatus = async (newStatus: 0 | 1) => {
+  const updateStatus = async (newStatus: ReceiptStatus) => {
     if (!detail || detail.isCanceled) return;
 
     try {
@@ -121,7 +121,7 @@ export default function AdminOnsiteDetailPage({ params }: { params: { id: string
       const res = await fetch(`/api/v1/admin/onsite/${params.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fulfillmentStatus: newStatus }),
+        body: JSON.stringify({ receiptStatus: newStatus }),
       });
       const json = await res.json();
       if (json.status === 'success') {
@@ -129,12 +129,12 @@ export default function AdminOnsiteDetailPage({ params }: { params: { id: string
           prev
             ? {
                 ...prev,
-                fulfillmentStatus: newStatus === 1 ? 'RECEIVED' : 'NOT_RECEIVED',
-                actionButtonState: prev.isCanceled ? 'CANCELED' : newStatus === 1 ? 'RECEIVED' : 'NOT_RECEIVED',
+                receiptStatus: newStatus,
+                actionButtonState: prev.isCanceled ? 'CANCELED' : newStatus,
               }
             : null
         );
-        if (newStatus === 1) {
+        if (newStatus === 'RECEIVED') {
           router.push('/admin/onsite');
         }
       } else {
@@ -151,7 +151,7 @@ export default function AdminOnsiteDetailPage({ params }: { params: { id: string
     if (!detail) return 'NOT_RECEIVED' as const;
     if (detail.actionButtonState) return detail.actionButtonState;
     if (detail.isCanceled) return 'CANCELED' as const;
-    return detail.fulfillmentStatus === 'RECEIVED' ? ('RECEIVED' as const) : ('NOT_RECEIVED' as const);
+    return detail.receiptStatus === 'RECEIVED' ? ('RECEIVED' as const) : ('NOT_RECEIVED' as const);
   }, [detail]);
 
   if (loading) {
@@ -272,7 +272,7 @@ export default function AdminOnsiteDetailPage({ params }: { params: { id: string
           ) : buttonState !== 'RECEIVED' ? (
             <button
               disabled={submitting}
-              onClick={() => updateStatus(1)}
+              onClick={() => updateStatus('RECEIVED')}
               className="flex h-[55px] w-full items-center justify-center rounded-[8px] bg-[#3f3835] text-[15px] font-bold text-[#fdfdfd] transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? '처리 중...' : '수령 완료'}
@@ -284,7 +284,7 @@ export default function AdminOnsiteDetailPage({ params }: { params: { id: string
               </div>
               <button
                 disabled={submitting}
-                onClick={() => updateStatus(0)}
+                onClick={() => updateStatus('NOT_RECEIVED')}
                 className="flex h-6 w-6 shrink-0 items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-50"
                 aria-label="수령 상태 되돌리기"
               >

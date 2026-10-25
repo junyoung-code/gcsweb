@@ -3,14 +3,15 @@ import { prisma } from '@/lib/db';
 import { requireAdmin } from '@/lib/admin-auth';
 import { formatDateTimePartsInSeoul } from '@/lib/datetime';
 import {
-  ONSITE_FULFILLMENT_STATUS,
-  ONSITE_PAYMENT_STATUS,
-  isCounterPaymentMethod,
-} from '@/lib/admin-onsite-status';
+  ORDER_PAYMENT_STATUS,
+  ORDER_RECEIPT_STATUSES,
+  isOnSitePaymentMethod,
+  type PaymentMethod,
+} from '@/lib/order-status';
 import { apiError as jsonError } from '@/lib/api-response';
 
-function toPaymentMethodLabel(paymentMethod: number): string {
-  return isCounterPaymentMethod(paymentMethod) ? '현장결제' : '온라인결제';
+function toPaymentMethodLabel(paymentMethod: PaymentMethod): string {
+  return isOnSitePaymentMethod(paymentMethod) ? '현장결제' : '온라인결제';
 }
 
 function normalizeTransactionId(impUid: unknown): string {
@@ -126,9 +127,8 @@ export async function GET(
     const HH = hour;
     const mm = minute;
 
-    const isCanceled = order.paymentStatus === ONSITE_PAYMENT_STATUS.CANCELED;
-    const fulfillmentStatus =
-      order.fulfillmentStatus === ONSITE_FULFILLMENT_STATUS.RECEIVED ? 'RECEIVED' : 'NOT_RECEIVED';
+    const isCanceled = order.paymentStatus === ORDER_PAYMENT_STATUS.CANCELED;
+    const receiptStatus = order.receiptStatus;
 
     const formattedData = {
       id: order.id,
@@ -145,8 +145,8 @@ export async function GET(
         method: toPaymentMethodLabel(order.paymentMethod),
         amount: `${order.paymentAmount.toLocaleString()}원`,
       },
-      fulfillmentStatus,
-      actionButtonState: isCanceled ? 'CANCELED' : fulfillmentStatus,
+      receiptStatus,
+      actionButtonState: isCanceled ? 'CANCELED' : receiptStatus,
     };
 
     return NextResponse.json({
@@ -171,22 +171,11 @@ export async function PATCH(
     if (!id) return jsonError(400, 'INVALID_INPUT', '주문 ID가 없습니다.');
 
     const body = await req.json().catch(() => ({} as Record<string, unknown>));
-    const rawFulfillmentStatus = (body as Record<string, unknown>).fulfillmentStatus;
+    const rawReceiptStatus = (body as Record<string, unknown>).receiptStatus;
     const rawPaymentStatus = (body as Record<string, unknown>).paymentStatus;
 
-    const fulfillmentStatus =
-      typeof rawFulfillmentStatus === 'number'
-        ? rawFulfillmentStatus
-        : typeof rawFulfillmentStatus === 'string'
-          ? Number(rawFulfillmentStatus)
-          : undefined;
-
-    const paymentStatus =
-      typeof rawPaymentStatus === 'number'
-        ? rawPaymentStatus
-        : typeof rawPaymentStatus === 'string'
-          ? Number(rawPaymentStatus)
-          : undefined;
+    const receiptStatus = ORDER_RECEIPT_STATUSES.find((value) => value === rawReceiptStatus);
+    const paymentStatus = rawPaymentStatus === ORDER_PAYMENT_STATUS.CANCELED ? ORDER_PAYMENT_STATUS.CANCELED : undefined;
 
     const targetOrder = await prisma.order.findUnique({ where: { id } });
     if (!targetOrder) {
@@ -194,47 +183,31 @@ export async function PATCH(
     }
 
     // 주문취소는 비가역 처리
-    if (paymentStatus === ONSITE_PAYMENT_STATUS.CANCELED) {
-      if (targetOrder.paymentStatus === ONSITE_PAYMENT_STATUS.CANCELED) {
+    if (paymentStatus === ORDER_PAYMENT_STATUS.CANCELED) {
+      if (targetOrder.paymentStatus === ORDER_PAYMENT_STATUS.CANCELED) {
         return NextResponse.json({ status: 'success', message: '주문취소완료' });
       }
 
       await prisma.order.update({
         where: { id },
-        data: { paymentStatus: ONSITE_PAYMENT_STATUS.CANCELED },
+        data: { paymentStatus: ORDER_PAYMENT_STATUS.CANCELED },
       });
 
       return NextResponse.json({ status: 'success', message: '주문취소완료' });
     }
 
-    if (
-      fulfillmentStatus !== ONSITE_FULFILLMENT_STATUS.NOT_RECEIVED &&
-      fulfillmentStatus !== ONSITE_FULFILLMENT_STATUS.RECEIVED
-    ) {
+    if (!receiptStatus) {
       return jsonError(400, 'INVALID_INPUT', '잘못된 수령 상태값입니다.');
     }
 
-    if (targetOrder.paymentStatus === ONSITE_PAYMENT_STATUS.CANCELED) {
+    if (targetOrder.paymentStatus === ORDER_PAYMENT_STATUS.CANCELED) {
       return jsonError(400, 'INVALID_INPUT', '주문취소 상태에서는 수령 상태를 변경할 수 없습니다.');
     }
 
-    const updateData: { fulfillmentStatus: number; paymentStatus?: number } = {
-      fulfillmentStatus,
-    };
-
-    // 현장결제 규칙
-    // 미수령 -> 수령완료 : 결제완료
-    // 수령완료 -> 미수령 : 미결제
-    if (isCounterPaymentMethod(targetOrder.paymentMethod)) {
-      updateData.paymentStatus =
-        fulfillmentStatus === ONSITE_FULFILLMENT_STATUS.RECEIVED
-          ? ONSITE_PAYMENT_STATUS.PAID
-          : ONSITE_PAYMENT_STATUS.UNPAID;
-    }
-
+    // 결제상태와 수령상태는 별개 축이다. 수령 여부만 바꾸고 결제상태는 건드리지 않는다.
     await prisma.order.update({
       where: { id },
-      data: updateData,
+      data: { receiptStatus },
     });
 
     return NextResponse.json({

@@ -6,6 +6,7 @@ import { NavBar } from '@/components/layout';
 import Button from '@/components/ui/button/Button';
 import CheckboxButton from '@/components/ui/button/CheckboxButton';
 import { formatPrice } from '@/lib/utils';
+import { ORDER_PAYMENT_METHOD } from '@/lib/order-status';
 
 type CartApiItem = {
   cartItemId: string;
@@ -161,7 +162,7 @@ function ShopOrdersBuyNowPageContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [items, setItems] = useState<OrderLineItem[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<0 | 3>(0);
+  const [paymentMethod, setPaymentMethod] = useState<typeof ORDER_PAYMENT_METHOD[keyof typeof ORDER_PAYMENT_METHOD]>(ORDER_PAYMENT_METHOD.ONLINE);
   const [bagOption, setBagOption] = useState<boolean | null>(null);
   const [showSoldOutModal, setShowSoldOutModal] = useState(false);
 
@@ -276,7 +277,7 @@ function ShopOrdersBuyNowPageContent() {
     return formatPrice(total);
   }, [bagOption, items]);
 
-  const isPayEnabled = items.length > 0 && (paymentMethod === 0 || paymentMethod === 3) && bagOption !== null;
+  const isPayEnabled = items.length > 0 && bagOption !== null;
 
   const handleSubmit = async () => {
     if (!isPayEnabled || isSubmitting) return;
@@ -367,7 +368,7 @@ function ShopOrdersBuyNowPageContent() {
       }
 
       // 결제 수단에 따라 리다이렉트
-      if (paymentMethod === 3) {
+      if (paymentMethod === ORDER_PAYMENT_METHOD.ON_SITE) {
         router.push(`/shop/orders/buynow/result?orderId=${orderId}&counterPay=1`);
       } else {
         router.push(`/shop/orders/buynow/pay?orderId=${orderId}`);
@@ -417,19 +418,19 @@ function ShopOrdersBuyNowPageContent() {
           <div className="flex gap-3">
             <Button
               size="s"
-              color={paymentMethod === 0 ? 'orange' : 'white'}
+              color={paymentMethod === ORDER_PAYMENT_METHOD.ONLINE ? 'orange' : 'white'}
               status="default"
               className="w-auto min-w-[88px]"
-              onClick={() => setPaymentMethod(0)}
+              onClick={() => setPaymentMethod(ORDER_PAYMENT_METHOD.ONLINE)}
             >
               온라인결제
             </Button>
             <Button
               size="s"
-              color={paymentMethod === 3 ? 'orange' : 'white'}
+              color={paymentMethod === ORDER_PAYMENT_METHOD.ON_SITE ? 'orange' : 'white'}
               status="default"
               className="w-auto min-w-[88px]"
-              onClick={() => setPaymentMethod(3)}
+              onClick={() => setPaymentMethod(ORDER_PAYMENT_METHOD.ON_SITE)}
             >
               현장결제
             </Button>

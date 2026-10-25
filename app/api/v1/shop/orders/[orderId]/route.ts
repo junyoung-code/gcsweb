@@ -6,6 +6,7 @@ import { prisma } from '@/lib/db';
 import { normalizeImageUrl } from '@/lib/image-url';
 import { apiError as jsonError } from '@/lib/api-response';
 import { formatPrice } from '@/lib/utils';
+import { toOrderReceiptStatusLabel } from '@/lib/order-status';
 
 function hashGuestToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -103,7 +104,7 @@ export async function GET(request: Request, { params }: Params) {
         bankCode: true,
         easyPayProvider: true,
         paymentStatus: true,
-        fulfillmentStatus: true,
+        receiptStatus: true,
         paymentAmount: true,
         createdAt: true,
         items: {
@@ -146,7 +147,7 @@ export async function GET(request: Request, { params }: Params) {
 
     const { buyerGuestTokenHash: _buyerGuestTokenHash, ...safeOrder } = order;
     const resolvedOrderCode = order.orderCode ?? order.id.slice(-10).toUpperCase();
-    const fulfillmentLabel = order.fulfillmentStatus === 1 ? '수령완료' : '미수령';
+    const receiptLabel = toOrderReceiptStatusLabel(order.receiptStatus);
 
     const mappedItems = order.items.map((item) => ({
       id: item.id,
@@ -159,7 +160,7 @@ export async function GET(request: Request, { params }: Params) {
       thumbnailUrl: normalizeImageUrl(item.product?.images?.[0]?.thumbnailImgUrl ?? null) ?? '',
       optionText: toOptionQuantityText(item.optionData, item.quantity),
       priceText: formatPrice((item.price ?? 0) * (item.quantity ?? 1)),
-      fulfillmentLabel,
+      receiptLabel,
     }));
 
     return NextResponse.json({

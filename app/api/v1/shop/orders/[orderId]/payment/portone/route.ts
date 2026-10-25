@@ -5,8 +5,9 @@ import {
   isPortoneCheckoutConfigured,
 } from '@/lib/payment/portone';
 import { apiError as jsonError } from '@/lib/api-response';
+import { ORDER_PAYMENT_STATUS, isOnSitePaymentMethod } from '@/lib/order-status';
 
-function orderUsesQrShopRedirect(items: Array<{ optionData: unknown }>): boolean {
+function isQrShopOrder(items: Array<{ optionData: unknown }>): boolean {
   return items.some((row) => {
     const d = row.optionData;
     if (!d || typeof d !== 'object') return false;
@@ -35,7 +36,7 @@ export async function GET(
     }
 
     const order = await prisma.order.findFirst({
-      where: { id: orderId, productType: { in: [0, 1] }, paymentStatus: 0 },
+      where: { id: orderId, productType: { in: [0, 1] }, paymentStatus: ORDER_PAYMENT_STATUS.PENDING },
       select: {
         id: true,
         productType: true,
@@ -61,7 +62,12 @@ export async function GET(
       return jsonError(404, 'ORDER_NOT_FOUND', 'order not found or not eligible.');
     }
 
-    if (order.paymentMethod === 3) {
+    // QR샵 v1은 종료됐다. 새 결제를 시작하지 않는다(shop buynow 결제는 그대로 동작).
+    if (isQrShopOrder(order.items)) {
+      return jsonError(410, 'QRSHOP_V1_DISABLED', 'QR샵 v1 결제는 종료되었습니다.');
+    }
+
+    if (isOnSitePaymentMethod(order.paymentMethod)) {
       return jsonError(400, 'COUNTER_PAYMENT_NOT_SUPPORTED', 'counter payment does not require PortOne payment.');
     }
 
@@ -74,7 +80,7 @@ export async function GET(
       process.env.NEXTAUTH_URL ??
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
 
-    const redirectPath = orderUsesQrShopRedirect(order.items) ? '/QRshop/v1/result' : '/shop/orders/buynow/result';
+    const redirectPath = '/shop/orders/buynow/result';
 
     // Buy Now에서는 주문자 정보를 수집하지 않으므로 PG 필수값은 서버 기본값으로 보강한다.
     const buyerName = order.ordererName?.trim() || '구매자';
