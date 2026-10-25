@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ prisma: { orderItem: { findFirst: vi.fn() } } }));
 
-import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
+import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 import { hasProductPaidSale, hasStorePaidSale } from './sales-history';
 
 const client = (found: boolean) => {
@@ -16,7 +16,7 @@ describe('hasStorePaidSale', () => {
     expect(await hasStorePaidSale('s1', c)).toBe(true);
     expect(findFirst.mock.calls[0][0].where).toEqual({
       onsiteProduct: { storeId: 's1' },
-      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
+      order: { paymentStatus: ORDER_PAYMENT_STATUS.PAID },
     });
   });
 
@@ -29,7 +29,7 @@ describe('hasProductPaidSale', () => {
   it('상품 기준으로 결제완료 항목을 조회한다', async () => {
     const { client: c, findFirst } = client(true);
     expect(await hasProductPaidSale('p1', c)).toBe(true);
-    expect(findFirst.mock.calls[0][0].where).toEqual({ onsiteProductId: 'p1', order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID } });
+    expect(findFirst.mock.calls[0][0].where).toEqual({ onsiteProductId: 'p1', order: { paymentStatus: ORDER_PAYMENT_STATUS.PAID } });
   });
 
   it('없으면 false', async () => {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { chargeWithBillingKey } from '@/lib/payment/portone';
 import { apiError as jsonError } from '@/lib/api-response';
+import { ORDER_PAYMENT_METHOD, ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 
 export async function POST(request: Request) {
   const configuredSecret = process.env.CRON_SECRET?.trim();
@@ -15,8 +16,8 @@ export async function POST(request: Request) {
     const orders = await prisma.order.findMany({
       where: {
         productType: 0,
-        paymentMethod: 0,
-        paymentStatus: 0,
+        paymentMethod: ORDER_PAYMENT_METHOD.ONLINE,
+        paymentStatus: ORDER_PAYMENT_STATUS.PENDING,
         billingKey: { not: null },
       },
       select: {
@@ -86,7 +87,7 @@ export async function POST(request: Request) {
 
       await prisma.order.update({
         where: { id: order.id },
-        data: { paymentStatus: 1 },
+        data: { paymentStatus: ORDER_PAYMENT_STATUS.PAID },
       });
       charged += 1;
     }

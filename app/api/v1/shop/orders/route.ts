@@ -14,6 +14,7 @@ import {
   mapProductTypeToOrderCode,
 } from '@/lib/order-code';
 import { apiError as jsonError } from '@/lib/api-response';
+import { ORDER_PAYMENT_METHOD, ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 
 function parsePositiveInt(value: string | null, fallback: number) {
   if (!value) return fallback;
@@ -128,7 +129,7 @@ export async function GET(request: Request) {
           bankCode: true,
           easyPayProvider: true,
           paymentStatus: true,
-          fulfillmentStatus: true,
+          receiptStatus: true,
           paymentAmount: true,
           createdAt: true,
           items: {
@@ -258,11 +259,13 @@ export async function POST(request: Request) {
       }
     }
 
-    if (isFund && (data.paymentMethod === 2 || data.paymentMethod === 3)) {
+    if (isFund && data.paymentMethod !== ORDER_PAYMENT_METHOD.ONLINE) {
       return jsonError(400, 'INVALID_PAYMENT_METHOD', 'this payment method is not allowed for fund.');
     }
     const normalizedBillingKey = data.billingKey?.trim() ?? '';
-    if (isFund && data.paymentMethod === 0 && !normalizedBillingKey) {
+    // fund 카드 결제(cardCompany 선택)는 빌링키가 필요하다. 계좌(bankCode)는 빌링키 없음.
+    const isFundCard = isFund && data.cardCompany !== null && data.cardCompany !== undefined;
+    if (isFundCard && !normalizedBillingKey) {
       return jsonError(400, 'BILLING_KEY_REQUIRED', 'billingKey is required for fund card payment.');
     }
 
@@ -355,14 +358,13 @@ export async function POST(request: Request) {
             ordererPhone,
             bagOption,
             paymentMethod: data.paymentMethod,
-            billingKey: isFund && data.paymentMethod === 0 ? normalizedBillingKey : null,
-            // DB constraint(Order_payment_detail_by_method_check) requires cardCompany for paymentMethod=0.
-            // BUY_NOW flow does not collect card company, so fallback to 0 as a server-side default.
-            cardCompany: data.paymentMethod === 0 ? (data.cardCompany ?? 0) : null,
-            bankCode: data.paymentMethod === 1 ? (data.bankCode ?? null) : null,
-            easyPayProvider: data.paymentMethod === 2 ? (data.easyPayProvider ?? null) : null,
-            paymentStatus: data.paymentMethod === 3 ? 1 : 0,
-            fulfillmentStatus: null,
+            billingKey: isFundCard ? normalizedBillingKey : null,
+            // 세부 결제수단은 온라인 fund에서만 받는다. 현장결제·buynow는 모두 null.
+            cardCompany: data.paymentMethod === ORDER_PAYMENT_METHOD.ONLINE ? (data.cardCompany ?? null) : null,
+            bankCode: data.paymentMethod === ORDER_PAYMENT_METHOD.ONLINE ? (data.bankCode ?? null) : null,
+            easyPayProvider: null,
+            // 현장결제도 접수 시점엔 대기. 결제완료는 관리자가 별도로 처리한다.
+            paymentStatus: ORDER_PAYMENT_STATUS.PENDING,
             paymentAmount,
           },
           select: {
@@ -387,7 +389,7 @@ export async function POST(request: Request) {
             bankCode: true,
             easyPayProvider: true,
             paymentStatus: true,
-            fulfillmentStatus: true,
+            receiptStatus: true,
             paymentAmount: true,
             createdAt: true,
           },

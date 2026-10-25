@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/db';
 import { apiErrors, apiSuccess } from '@/lib/api-response';
-import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
+import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 import {
   buildVisitorOrderUrl,
   getSellerContext,
@@ -35,7 +35,7 @@ export async function GET() {
     const paidTodayLine = {
       onsiteProduct: { storeId: store.storeId },
       order: {
-        paymentStatus: ONSITE_PAYMENT_STATUS.PAID,
+        paymentStatus: ORDER_PAYMENT_STATUS.PAID,
         orderDate: { gte: start, lt: end },
       },
     };
@@ -67,7 +67,7 @@ export async function GET() {
       todayOrderCount,
     });
   } catch (error) {
-    console.error('[seller/summary] GET error:', error);
+    console.error('[qrshop/summary] GET error:', error);
     return apiErrors.serverError();
   }
 }

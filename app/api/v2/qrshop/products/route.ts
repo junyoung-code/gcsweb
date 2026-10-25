@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiError, apiErrors, apiSuccess } from '@/lib/api-response';
-import { ONSITE_PAYMENT_STATUS } from '@/lib/admin-onsite-status';
+import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 import { getSellerContext } from '@/lib/seller/store';
 import {
   buildProductListWhere,
@@ -123,7 +123,7 @@ async function findSoldProductIds(productIds: string[]): Promise<Set<string>> {
   const lines = await prisma.orderItem.findMany({
     where: {
       onsiteProductId: { in: productIds },
-      order: { paymentStatus: ONSITE_PAYMENT_STATUS.PAID },
+      order: { paymentStatus: ORDER_PAYMENT_STATUS.PAID },
     },
     select: { onsiteProductId: true },
     distinct: ['onsiteProductId'],

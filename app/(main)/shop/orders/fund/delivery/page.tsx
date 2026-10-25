@@ -8,6 +8,7 @@ import TextField from '@/components/ui/common/TextField';
 import Button from '@/components/ui/button/Button';
 import Dropdown from '@/components/ui/button/Dropdown';
 import { formatPrice } from '@/lib/utils';
+import { ORDER_PAYMENT_METHOD } from '@/lib/order-status';
 
 const POSTCODE_SCRIPT = 'https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 
@@ -305,7 +306,7 @@ function ShopOrdersPageContent() {
         deliveryMessage: deliveryMessage.trim(),
         ordererName: receiverName.trim(),
         ordererPhone: receiverPhone.trim(),
-        paymentMethod,
+        paymentMethod: ORDER_PAYMENT_METHOD.ONLINE, // 카드/계좌 구분은 cardCompany|bankCode
         billingKey: paymentMethod === 0 ? billingKey : undefined,
         cardCompany: paymentMethod === 0 ? cardCompany : null,
         bankCode: paymentMethod === 1 ? bankCode : null,

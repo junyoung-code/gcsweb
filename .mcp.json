@@ -5,16 +5,8 @@
       "url": "https://mcp.figma.com/mcp"
     },
     "notion": {
-      "command": "cmd",
-      "args": [
-        "/c",
-        "npx",
-        "-y",
-        "@notionhq/notion-mcp-server"
-      ],
-      "env": {
-        "NOTION_TOKEN": "${NOTION_TOKEN}"
-      }
+      "type": "http",
+      "url": "https://mcp.notion.com/mcp"
     },
     "erdcloud": {
       "type": "http",

@@ -12,7 +12,7 @@ type OrderResultItem = {
   optionText: string;
   priceText: string;
   thumbnailUrl: string;
-  fulfillmentLabel: string;
+  receiptLabel: string;
 };
 
 type OrderResultData = {
@@ -121,7 +121,7 @@ function ResultContent() {
           optionText: String(item?.optionText ?? ''),
           priceText: String(item?.priceText ?? ''),
           thumbnailUrl: String(item?.thumbnailUrl ?? ''),
-          fulfillmentLabel: String(item?.fulfillmentLabel ?? '미수령'),
+          receiptLabel: String(item?.receiptLabel ?? '미수령'),
         })),
       });
     })();
@@ -161,7 +161,7 @@ function ResultContent() {
                 <article key={item.id} className="rounded-lg border border-neutral-4 bg-neutral-2 px-[18px] pb-4 pt-3">
                   <div className="flex flex-col gap-[14px]">
                     <div className="flex h-7 items-center border-b border-dashed border-neutral-5">
-                      <p className="typo-body-xsmall text-neutral-8">{item.fulfillmentLabel || '미수령'}</p>
+                      <p className="typo-body-xsmall text-neutral-8">{item.receiptLabel || '미수령'}</p>
                     </div>
 
                     <Productcard

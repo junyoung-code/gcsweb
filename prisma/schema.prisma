@@ -7,6 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---------- 유저 / 팀 ----------
+
 model User {
   id                  String         @id @default(cuid())
   email               String         @unique
@@ -56,12 +58,13 @@ model Team {
   isSalesTeam            Boolean      @default(false)
   products               Product[]
   projects               Project[]
-  settlements            Settlement[]
   user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([teamName])
 }
+
+// ---------- 상품 (shop) ----------
 
 model Product {
   id                  String           @id @default(cuid())
@@ -160,6 +163,8 @@ model ProductImage {
   @@index([productId])
 }
 
+// ---------- 주문 / 결제 ----------
+
 model Order {
   id                    String      @id @default(cuid())
   userId                String?
@@ -177,9 +182,9 @@ model Order {
   deliveryMessage       String?
   ordererName           String?
   ordererPhone          String?
-  paymentStatus         Int         @default(0)
-  fulfillmentStatus     Int?
-  paymentMethod         Int
+  paymentStatus         PaymentStatus @default(PENDING) /// 결제상태 (수령상태와 별개 축)
+  receiptStatus         ReceiptStatus @default(NOT_RECEIVED) /// 수령상태 (결제상태와 연동하지 않음)
+  paymentMethod         PaymentMethod /// 결제방법 (세부 PG 수단은 사이트가 나누지 않음)
   cardCompany           Int?
   bankCode              Int?
   easyPayProvider       Int?
@@ -199,7 +204,7 @@ model Order {
   @@index([userId])
   @@index([productType, receiveMethod])
   @@index([paymentStatus])
-  @@index([fulfillmentStatus])
+  @@index([receiptStatus])
   @@index([orderDate])
   @@index([orderDateKey, productType])
   @@index([bankCode])
@@ -239,17 +244,17 @@ model OrderItem {
   @@index([onsiteOptionId])
 }
 
+// ---------- 상품 (QRshop) ----------
+
 /// QRshop(/Fair) 메뉴별 재고. qrItemId 는 app/QRshop/item.json 의 id 와 동일
 model FairShopProduct {
   id           String   @id @default(cuid())
   qrItemId     String   @unique
   initStock    Int
-  /// 판매 가능 재고(결제 확정 시 감소)
-  stock        Int
+  stock        Int /// 판매 가능 재고(결제 확정 시 감소)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  /// 미충족 수요 누적(판매 재고 0일 때 결제 시도마다 요청 수량만큼 감소 → 음수). 분석용.
-  currentStock Int      @default(0)
+  currentStock Int      @default(0) /// 미충족 수요 누적(판매 재고 0일 때 결제 시도마다 요청 수량만큼 감소 → 음수). 분석용
 
   @@map("FairShopProductTable")
 }
@@ -257,13 +262,10 @@ model FairShopProduct {
 /// QRshop 상점
 model Store {
   storeId   String  @id @default(cuid())
-  /// 상점 소유자. 1인 1상점이므로 unique. 판매이력이 있는 상점은 소유자(User)가 삭제돼도 null로 남는다(SetNull).
-  userId    String? @unique
+  userId    String? @unique /// 1인 1상점이므로 unique. 소유자(User)가 삭제되도 판매이력이 있는 상점은 삭제되지 않음 (userId null로 유지, SetNull)
   name      String  @db.VarChar(16)
   storeSlug String  @unique         // 상점URL 식별자
-  /// 상점 프로필 이미지.
-  imageUrl  String?
-
+  imageUrl  String? /// 상점 프로필 이미지
   createdAt  DateTime                @default(now())
   updatedAt  DateTime                @updatedAt
   user       User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -285,24 +287,18 @@ model OnsiteProductCategory {
   @@index([storeId])
 }
 
-/// QRshop 상품.
-/// price는 hasOption 여부와 무관하게 항상 존재하는 **기본가**다.
-/// 옵션을 쓰면 최종가 = price + OnsiteProductOption.surcharge 이고,
-/// initStock/currentStock은 옵션 재고의 합계를 담는다(옵션 미사용이면 입력값 그대로).
-/// price/initStock/currentStock >= 0 은 DB CHECK 제약으로 강제(마이그레이션 참고, Prisma 스키마 문법상 표현 불가).
+/// QRshop 상품
 model OnsiteProduct {
   productId      String                 @id @default(cuid())
   storeId        String
   categoryId     String?
   name           String                 @db.VarChar(20)
   hasOption      Boolean                @default(false)
-  price          Int /// 기본가(0 이상). 옵션 사용 시에도 유지한다.
-  initStock      Int /// 최초 재고(0 이상). 옵션 사용 시 옵션 initStock 합계.
-  currentStock   Int /// 판매 가능 재고(결제 확정 시 차감). 옵션 사용 시 옵션 currentStock 합계.
-  /// 상품 대표 이미지.
-  imageUrl       String?
-  /// item.json/FairShopProductTable 이관 추적용(임시). 이관 검증 끝나면 삭제 예정.
-  legacyQrItemId String?                @unique
+  price          Int /// 기본가(0 이상, DB CHECK로 강제). hasOption 여부와 무관하게 항상 존재, 옵션 사용 시 최종가 = price + 옵션 surcharge
+  initStock      Int /// 최초 재고(0 이상, DB CHECK로 강제). 옵션 사용 시 옵션 initStock 합계
+  currentStock   Int /// 판매 가능 재고(0 이상, DB CHECK로 강제, 결제 확정 시 차감). 옵션 사용 시 옵션 currentStock 합계
+  imageUrl       String? /// 상품 대표 이미지
+  legacyQrItemId String?                @unique /// item.json/FairShopProductTable 이관 추적용(임시). 이관 검증 끝나면 삭제 예정
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   store          Store                  @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
@@ -314,17 +310,14 @@ model OnsiteProduct {
   @@index([categoryId])
 }
 
-/// QRshop 상품 옵션. 상품이 hasOption=true 일 때만 사용된다.
-/// surcharge는 절대가격이 아니라 상품 기본가에 **더하는 금액**이다.
-/// surcharge/initStock/currentStock >= 0 은 DB CHECK 제약으로 강제(마이그레이션 참고, Prisma 스키마 문법상 표현 불가).
+/// QRshop 상품 옵션. 상품이 hasOption=true 일 때만 사용
 model OnsiteProductOption {
   optionId       String        @id @default(cuid())
   productId      String
   name           String        @db.VarChar(18)
-  /// 기본가에 더해지는 추가금(0 이상).
-  surcharge      Int           @default(0)
-  initStock      Int
-  currentStock   Int /// 판매 가능 재고(결제 확정 시 차감)
+  surcharge      Int           @default(0) /// 기본가에 더해지는 추가금(0 이상, 절대가격 아님, DB CHECK로 강제)
+  initStock      Int /// 최초 재고(0 이상, DB CHECK로 강제)
+  currentStock   Int /// 판매 가능 재고(0 이상, DB CHECK로 강제, 결제 확정 시 차감)
   legacyQrItemId String?       @unique /// item.json 이관 추적용(임시). 이관 검증 끝나면 삭제 예정.
   product        OnsiteProduct @relation(fields: [productId], references: [productId], onDelete: Cascade)
   orderItems     OrderItem[]
@@ -333,35 +326,35 @@ model OnsiteProductOption {
   @@index([productId])
 }
 
-model Scrap {
-  id        String   @id @default(cuid())
-  userId    String
-  projectId String?
-  productId String?
-  createdAt DateTime @default(now())
-  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
-  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+// ---------- 장바구니 ----------
 
-  @@unique([userId, projectId])
-  @@unique([userId, productId])
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+
   @@index([userId])
-  @@index([projectId])
+}
+
+model CartItem {
+  id         String   @id @default(cuid())
+  cartId     String
+  productId  String
+  quantity   Int      @default(1)
+  price      Int
+  optionData Json?
+  createdAt  DateTime @default(now())
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([cartId])
   @@index([productId])
 }
 
-model Image {
-  id        String   @id @default(cuid()) @map("imageId")
-  usage     String
-  fileSize  Int
-  mimeType  String
-  imageUrl  String   @default("")
-  data      Bytes?
-  createdAt DateTime @default(now())
-
-  @@index([usage])
-  @@map("Image")
-}
+// ---------- 프로젝트 (archive) ----------
 
 model ProjectCategory {
   id       String    @id @default(cuid()) @map("categoryId")
@@ -409,43 +402,7 @@ model Project {
   @@index([softDeletedAt])
 }
 
-model Inquiry {
-  id        String   @id @default(cuid())
-  userId    String
-  orderId   String?
-  content   String
-  status    Int      @default(0)
-  createdAt DateTime @default(now())
-  order     Order?   @relation(fields: [orderId], references: [id])
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([orderId])
-  @@index([status])
-}
-
-model Settlement {
-  id                  String    @id @default(cuid())
-  orderId             String?
-  teamId              String
-  teamName            String
-  grossAmount         Int
-  productionCost      Int       @default(0)
-  refundAmount        Int       @default(0)
-  feeAmount           Int       @default(0)
-  paidDate            DateTime?
-  attachmentUrl       String?
-  settlementStartDate DateTime
-  settlementEndDate   DateTime
-  status              Int       @default(0)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  team                Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([teamId])
-  @@index([status])
-  @@index([settlementStartDate, settlementEndDate])
-}
+// ---------- 사용자 활동 (좋아요 / 스크랩 / 알림 / 문의) ----------
 
 model Like {
   id        String   @id @default(cuid())
@@ -462,15 +419,21 @@ model Like {
   @@index([userId])
 }
 
-model VerificationToken {
-  id         String   @id @default(cuid())
-  identifier String
-  token      String   @unique
-  expires    DateTime
-  createdAt  DateTime @default(now())
+model Scrap {
+  id        String   @id @default(cuid())
+  userId    String
+  projectId String?
+  productId String?
+  createdAt DateTime @default(now())
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([identifier, token])
-  @@index([identifier])
+  @@unique([userId, projectId])
+  @@unique([userId, productId])
+  @@index([userId])
+  @@index([projectId])
+  @@index([productId])
 }
 
 model Notification {
@@ -488,30 +451,45 @@ model Notification {
   @@index([isRead])
 }
 
-model Cart {
-  id        String     @id @default(cuid())
+model Inquiry {
+  id        String   @id @default(cuid())
   userId    String
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items     CartItem[]
+  orderId   String?
+  content   String
+  status    Int      @default(0)
+  createdAt DateTime @default(now())
+  order     Order?   @relation(fields: [orderId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([orderId])
+  @@index([status])
 }
 
-model CartItem {
-  id         String   @id @default(cuid())
-  cartId     String
-  productId  String
-  quantity   Int      @default(1)
-  price      Int
-  optionData Json?
-  createdAt  DateTime @default(now())
-  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+// ---------- 공통 (이미지 / 인증토큰 / 약관) ----------
 
-  @@index([cartId])
-  @@index([productId])
+model Image {
+  id        String   @id @default(cuid()) @map("imageId")
+  usage     String
+  fileSize  Int
+  mimeType  String
+  imageUrl  String   @default("")
+  data      Bytes?
+  createdAt DateTime @default(now())
+
+  @@index([usage])
+  @@map("Image")
+}
+
+model VerificationToken {
+  id         String   @id @default(cuid())
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([identifier, token])
+  @@index([identifier])
 }
 
 model Term {
@@ -528,6 +506,8 @@ model Term {
   @@index([order])
 }
 
+// ---------- Enum ----------
+
 enum SignupMethod {
   EMAIL
   KAKAO
@@ -536,4 +516,21 @@ enum SignupMethod {
 enum BuyerType {
   USER
   GUEST
+}
+
+enum PaymentStatus {
+  PENDING /// 대기
+  PAID /// 완료
+  CANCELED /// 취소
+  FAILED /// 실패
+}
+
+enum PaymentMethod {
+  ONLINE /// 온라인결제
+  ON_SITE /// 현장결제
+}
+
+enum ReceiptStatus {
+  NOT_RECEIVED /// 미수령
+  RECEIVED /// 수령완료
 }
