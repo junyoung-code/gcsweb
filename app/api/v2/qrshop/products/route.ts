@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { apiError, apiErrors, apiSuccess } from '@/lib/api-response';
-import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
+import { findPaidSoldProductIds } from '@/lib/qrshop/sales-history';
 import { getSellerContext } from '@/lib/seller/store';
 import {
   buildProductListWhere,
@@ -116,26 +116,6 @@ function toResponse(product: ProductRow, hasSalesHistory = false) {
   };
 }
 
-/** 결제완료 주문에 한 번이라도 팔린 상품 id 집합. 상품이 없으면 질의하지 않는다. */
-async function findSoldProductIds(productIds: string[]): Promise<Set<string>> {
-  if (productIds.length === 0) return new Set();
-
-  const lines = await prisma.orderItem.findMany({
-    where: {
-      onsiteProductId: { in: productIds },
-      order: { paymentStatus: ORDER_PAYMENT_STATUS.PAID },
-    },
-    select: { onsiteProductId: true },
-    distinct: ['onsiteProductId'],
-  });
-
-  return new Set(
-    lines
-      .map((line) => line.onsiteProductId)
-      .filter((id): id is string => id !== null),
-  );
-}
-
 /**
  * 내 상점의 상품 목록. 최신 등록 순.
  *
@@ -182,7 +162,7 @@ export async function GET(request: Request) {
       prisma.onsiteProduct.count({ where: { storeId } }),
     ]);
 
-    const soldProductIds = await findSoldProductIds(
+    const soldProductIds = await findPaidSoldProductIds(
       products.map((product) => product.productId),
     );
 

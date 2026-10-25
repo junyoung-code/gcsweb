@@ -1,17 +1,16 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@/lib/db';
-import { hasProductPaidSale } from '@/lib/qrshop/sales-history';
+import { findPaidSoldProductIds, hasProductPaidSale } from '@/lib/qrshop/sales-history';
 import { getSellerContext } from '@/lib/seller/store';
 import { GET } from './route';
 import { DELETE } from './[onsiteProductId]/route';
 
 vi.mock('@/lib/seller/store', () => ({ getSellerContext: vi.fn() }));
-vi.mock('@/lib/qrshop/sales-history', () => ({ hasProductPaidSale: vi.fn() }));
+vi.mock('@/lib/qrshop/sales-history', () => ({ hasProductPaidSale: vi.fn(), findPaidSoldProductIds: vi.fn() }));
 vi.mock('@/lib/db', () => ({
   prisma: {
     onsiteProduct: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn(), delete: vi.fn() },
-    orderItem: { findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -19,11 +18,11 @@ vi.mock('@/lib/db', () => ({
 type Fn = ReturnType<typeof vi.fn>;
 const context = getSellerContext as unknown as Fn;
 const paidSale = hasProductPaidSale as unknown as Fn;
+const soldIds = findPaidSoldProductIds as unknown as Fn;
 const product = prisma.onsiteProduct as unknown as Record<
   'findMany' | 'findFirst' | 'count' | 'delete',
   Fn
 >;
-const orderItem = prisma.orderItem as unknown as Record<'findMany', Fn>;
 const transaction = prisma.$transaction as unknown as Fn;
 
 const STORE = { storeId: 's1', name: '상점', storeSlug: 'shop', imageUrl: null };
@@ -50,7 +49,7 @@ const remove = () =>
 beforeEach(() => {
   vi.resetAllMocks();
   context.mockResolvedValue({ ok: true, userId: 'u1', store: STORE });
-  orderItem.findMany.mockResolvedValue([]);
+  soldIds.mockResolvedValue(new Set());
   transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma));
 });
 
@@ -117,9 +116,10 @@ describe('GET /api/v2/qrshop/products', () => {
   it('결제완료 주문에 팔린 상품만 hasSalesHistory=true', async () => {
     product.findMany.mockResolvedValue([row('p1'), row('p2')]);
     product.count.mockResolvedValue(2);
-    orderItem.findMany.mockResolvedValue([{ onsiteProductId: 'p2' }]);
+    soldIds.mockResolvedValue(new Set(['p2']));
 
     const { products } = (await (await list()).json()).data;
+    expect(soldIds).toHaveBeenCalledWith(['p1', 'p2']);
     expect(
       products.map((p: { id: string; hasSalesHistory: boolean }) => [p.id, p.hasSalesHistory]),
     ).toEqual([
