@@ -58,7 +58,6 @@ model Team {
   isSalesTeam            Boolean      @default(false)
   products               Product[]
   projects               Project[]
-  settlements            Settlement[]
   user                   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
@@ -466,31 +465,6 @@ model Inquiry {
   @@index([userId])
   @@index([orderId])
   @@index([status])
-}
-
-// ---------- 정산 ----------
-
-model Settlement {
-  id                  String    @id @default(cuid())
-  orderId             String?
-  teamId              String
-  teamName            String
-  grossAmount         Int
-  productionCost      Int       @default(0)
-  refundAmount        Int       @default(0)
-  feeAmount           Int       @default(0)
-  paidDate            DateTime?
-  attachmentUrl       String?
-  settlementStartDate DateTime
-  settlementEndDate   DateTime
-  status              Int       @default(0)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
-  team                Team      @relation(fields: [teamId], references: [id], onDelete: Cascade)
-
-  @@index([teamId])
-  @@index([status])
-  @@index([settlementStartDate, settlementEndDate])
 }
 
 // ---------- 공통 (이미지 / 인증토큰 / 약관) ----------
