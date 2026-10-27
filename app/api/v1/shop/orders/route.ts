@@ -401,7 +401,6 @@ export async function POST(request: Request) {
               data: {
                 orderId: order.id,
                 productId: row.productId,
-                productType: data.productType,
                 quantity: row.quantity,
                 price: row.price,
                 optionData: row.optionData,

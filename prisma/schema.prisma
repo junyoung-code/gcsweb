@@ -249,7 +249,6 @@ model OrderItem {
   price             Int /// 단가 (주문 시점)
   optionData        Json? /// 레거시. 새 로직은 사용하지 않음
   createdAt         DateTime             @default(now())
-  productType       Int
   onsiteProductId   String?
   onsiteOptionId    String?
   onsiteProductName String? /// 주문 시점 상품명 (상품이 수정·삭제돼도 유지)
