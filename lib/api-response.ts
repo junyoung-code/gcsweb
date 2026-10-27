@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 
-export function apiError(status: number, code: string, message: string) {
-  return NextResponse.json({ status: 'error', code, message }, { status });
+/** `data`는 에러에 부가 정보가 필요할 때만 넘긴다(예: 품절 항목 목록). 넘기지 않으면 응답에 data 키가 없다. */
+export function apiError(status: number, code: string, message: string, data?: unknown) {
+  return NextResponse.json(
+    { status: 'error', code, message, ...(data !== undefined ? { data } : {}) },
+    { status },
+  );
 }
 
 export function apiSuccess<T>(data: T, code?: string) {
