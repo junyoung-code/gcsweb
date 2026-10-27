@@ -20,7 +20,18 @@ export type OrderLine = {
   quantity: number;
 };
 
-export type SoldOutItem = { productId: string | null; optionId: string | null; name: string };
+/**
+ * 품절·재고 부족 항목. 프론트는 `상품명(옵션명)`으로 표시하고,
+ * `availableQuantity`가 0이면 "품절", 0보다 크면 "품절임박 N개"로 안내한다.
+ */
+export type SoldOutItem = {
+  productId: string | null;
+  optionId: string | null;
+  name: string;
+  optionName: string | null;
+  /** 현재 남은 재고(요청 수량보다 적음). 상품·옵션이 삭제됐으면 0 */
+  availableQuantity: number;
+};
 
 export type ValidatedOrder = {
   store: { storeId: string; name: string; storeSlug: string };
@@ -107,7 +118,13 @@ export async function validateOrderItems(
     }
 
     if (stock < item.quantity) {
-      soldOutItems.push({ productId: product.productId, optionId: item.optionId, name: product.name });
+      soldOutItems.push({
+        productId: product.productId,
+        optionId: item.optionId,
+        name: product.name,
+        optionName,
+        availableQuantity: Math.max(stock, 0),
+      });
     }
 
     lines.push({

@@ -89,7 +89,7 @@ describe('validateOrderItems (주문 항목 검증·가격 계산)', () => {
     expect(result).toEqual({
       ok: false,
       reason: 'SOLD_OUT',
-      soldOutItems: [{ productId: 'p-postcard', optionId: null, name: '엽서 A' }],
+      soldOutItems: [{ productId: 'p-postcard', optionId: null, name: '엽서 A', optionName: null, availableQuantity: 5 }],
     });
   });
 
@@ -118,7 +118,7 @@ describe('validateOrderItems (주문 항목 검증·가격 계산)', () => {
     expect(await validateOrderItems(client, { storeSlug: 'nirvanaexpress', items: [item] })).toEqual({ ok: false, reason });
   });
 
-  it('품절 항목을 모두 모아서 돌려준다 (옵션 재고 기준)', async () => {
+  it('품절(남은 0)과 재고 부족(품절임박, 남은 수량)을 옵션명과 함께 모두 모아서 돌려준다', async () => {
     const { client } = makeClient();
     const result = await validateOrderItems(client, {
       storeSlug: 'nirvanaexpress',
@@ -132,8 +132,8 @@ describe('validateOrderItems (주문 항목 검증·가격 계산)', () => {
       ok: false,
       reason: 'SOLD_OUT',
       soldOutItems: [
-        { productId: 'p-keyring', optionId: 'o-day4', name: '키캡키링 A' },
-        { productId: 'p-keyring', optionId: 'o-day1', name: '키캡키링 A' },
+        { productId: 'p-keyring', optionId: 'o-day4', name: '키캡키링 A', optionName: '4일차', availableQuantity: 0 },
+        { productId: 'p-keyring', optionId: 'o-day1', name: '키캡키링 A', optionName: '1일차', availableQuantity: 3 },
       ],
     });
   });

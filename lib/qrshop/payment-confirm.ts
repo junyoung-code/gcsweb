@@ -13,10 +13,23 @@ import type { SoldOutItem } from './order-validation';
  * 3) 결제는 됐는데 재고가 모자라면 트랜잭션이 롤백되고 전액 환불한 뒤 CANCELED 로 기록한다.
  *    환불 호출이 실패하면 refundFailedAt 을 남겨 수동 처리 대상으로 표시한다.
  *
+ * FAILED 주문도 확정 대상이다. 결제창이 오래 걸려 시간 초과로 FAILED 가 된 뒤에 결제가 완료될 수 있고
+ * (앱카드·간편결제 인증 등), 그때 고객은 이미 돈을 냈으므로 정상 주문으로 살린다.
+ *
  * PortOne 결제 ID 는 주문 ID(Order.id)와 같다.
  */
 export const CANCEL_REASON_STOCK_SHORTAGE = 'STOCK_SHORTAGE';
 const REFUND_REASON_STOCK_SHORTAGE = '재고 부족으로 인한 자동 환불';
+
+/** 결제 확정으로 PAID 가 될 수 있는 상태. CANCELED 는 환불까지 끝난 주문이라 제외한다. */
+const CONFIRMABLE_STATUSES: PaymentStatus[] = [ORDER_PAYMENT_STATUS.PENDING, ORDER_PAYMENT_STATUS.FAILED];
+
+function isConfirmable(status: PaymentStatus): boolean {
+  return CONFIRMABLE_STATUSES.includes(status);
+}
+
+/** 결제 대기 주문을 결제창 이탈로 보고 FAILED 로 바꾸는 기준 시간(주문 생성 후). */
+export const PENDING_EXPIRE_MS = 10 * 60 * 1000;
 
 export type ConfirmResult =
   | { kind: 'PAID'; alreadyPaid: boolean }
@@ -58,10 +71,17 @@ async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]):
   const soldOut: SoldOutItem[] = [];
 
   for (const item of items) {
-    const name = item.onsiteProductName ?? '';
+    const shortage = (availableQuantity: number): SoldOutItem => ({
+      productId: item.onsiteProductId,
+      optionId: item.onsiteOptionId,
+      name: item.onsiteProductName ?? '',
+      optionName: item.onsiteOptionName,
+      availableQuantity: Math.max(availableQuantity, 0),
+    });
+
     const deletedOption = item.onsiteOptionName !== null && item.onsiteOptionId === null;
     if (item.onsiteProductId === null || deletedOption) {
-      soldOut.push({ productId: item.onsiteProductId, optionId: item.onsiteOptionId, name });
+      soldOut.push(shortage(0));
       continue;
     }
 
@@ -71,7 +91,11 @@ async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]):
         data: { currentStock: { decrement: item.quantity } },
       });
       if (option.count !== 1) {
-        soldOut.push({ productId: item.onsiteProductId, optionId: item.onsiteOptionId, name });
+        const current = await tx.onsiteProductOption.findUnique({
+          where: { optionId: item.onsiteOptionId },
+          select: { currentStock: true },
+        });
+        soldOut.push(shortage(current?.currentStock ?? 0));
         continue;
       }
     }
@@ -81,7 +105,11 @@ async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]):
       data: { currentStock: { decrement: item.quantity } },
     });
     if (product.count !== 1) {
-      soldOut.push({ productId: item.onsiteProductId, optionId: item.onsiteOptionId, name });
+      const current = await tx.onsiteProduct.findUnique({
+        where: { productId: item.onsiteProductId },
+        select: { currentStock: true },
+      });
+      soldOut.push(shortage(current?.currentStock ?? 0));
     }
   }
 
@@ -121,7 +149,7 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
   if (!order || !order.orderNumber) return { kind: 'NOT_FOUND' };
 
   if (order.paymentStatus === ORDER_PAYMENT_STATUS.PAID) return { kind: 'PAID', alreadyPaid: true };
-  if (order.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING) {
+  if (!isConfirmable(order.paymentStatus)) {
     return { kind: 'CLOSED', paymentStatus: order.paymentStatus, cancelReason: order.cancelReason };
   }
 
@@ -146,7 +174,7 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
         });
         if (!current) return { kind: 'NOT_FOUND' };
         if (current.paymentStatus === ORDER_PAYMENT_STATUS.PAID) return { kind: 'PAID', alreadyPaid: true };
-        if (current.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING) {
+        if (!isConfirmable(current.paymentStatus)) {
           return { kind: 'CLOSED', paymentStatus: current.paymentStatus, cancelReason: current.cancelReason };
         }
 
@@ -182,7 +210,7 @@ async function refundForStockShortage(
 
   if (refund.success) {
     await deps.db.order.updateMany({
-      where: { id: orderId, paymentStatus: ORDER_PAYMENT_STATUS.PENDING },
+      where: { id: orderId, paymentStatus: { in: CONFIRMABLE_STATUSES } },
       data: {
         paymentStatus: ORDER_PAYMENT_STATUS.CANCELED,
         canceledAt: now,
@@ -198,8 +226,43 @@ async function refundForStockShortage(
     message: refund.message ?? null,
   });
   await deps.db.order.updateMany({
-    where: { id: orderId, paymentStatus: ORDER_PAYMENT_STATUS.PENDING },
+    where: { id: orderId, paymentStatus: { in: CONFIRMABLE_STATUSES } },
     data: { refundFailedAt: now, cancelReason: CANCEL_REASON_STOCK_SHORTAGE },
   });
   return { kind: 'STOCK_SHORTAGE', soldOutItems, refunded: false };
+}
+
+/**
+ * 결제창 이탈 판정. 주문 조회·결제 검증에서 먼저 호출한다(크론 없이 조회 시점에 판정).
+ *
+ * 생성 후 PENDING_EXPIRE_MS 가 지난 PENDING 주문이면 PortOne 에 실제 결제 여부를 확인한다.
+ * 결제됐으면 확정(confirmOrderPayment)하고, 결제 전이면 FAILED 로 바꾼다. 조회 실패·금액 불일치는 그대로 둔다.
+ * 환불 실패로 수동 처리 대기 중인 주문(refundFailedAt)은 건드리지 않는다.
+ *
+ * 상태가 바뀌었으면 true 를 돌려준다(호출 쪽이 주문을 다시 읽는다).
+ */
+export async function settleStalePendingOrder(
+  order: { id: string; paymentStatus: PaymentStatus; createdAt: Date; refundFailedAt: Date | null },
+  overrides: Partial<ConfirmDeps> = {},
+): Promise<boolean> {
+  const deps: ConfirmDeps = {
+    db: prisma,
+    getPayment,
+    cancelPayment,
+    now: () => new Date(),
+    ...overrides,
+  };
+
+  if (order.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING || order.refundFailedAt) return false;
+  if (deps.now().getTime() - order.createdAt.getTime() < PENDING_EXPIRE_MS) return false;
+
+  const result = await confirmOrderPayment(order.id, deps);
+  if (result.kind === 'NOT_PAID') {
+    const expired = await deps.db.order.updateMany({
+      where: { id: order.id, paymentStatus: ORDER_PAYMENT_STATUS.PENDING, refundFailedAt: null },
+      data: { paymentStatus: ORDER_PAYMENT_STATUS.FAILED },
+    });
+    return expired.count > 0;
+  }
+  return result.kind === 'PAID' || result.kind === 'STOCK_SHORTAGE';
 }
