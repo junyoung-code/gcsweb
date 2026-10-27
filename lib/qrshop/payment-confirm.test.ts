@@ -32,6 +32,7 @@ const baseOrder = (overrides: Record<string, unknown> = {}) => ({
   paymentStatus: 'PENDING',
   paymentAmount: 12000,
   cancelReason: null,
+  refundFailedAt: null,
   orderNumber: { type: 'ONSITE' },
   items: [optionItem, plainItem],
   ...overrides,
@@ -132,6 +133,31 @@ describe('confirmOrderPayment', () => {
     t.getPayment.mockResolvedValue({ success: true, status: 'READY', amount: { total: 12000 } });
     expect(await confirmOrderPayment('ord1', t.deps)).toEqual({ kind: 'NOT_PAID', paymentStatus: 'PENDING', portoneStatus: 'READY' });
     expect(t.db.$transaction).not.toHaveBeenCalled();
+    expect(t.db.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('PortOne 에서 PG 승인 실패(FAILED)면 결제 대기 주문을 바로 FAILED 로 바꾼다 (금액 비교 없음)', async () => {
+    const t = setup(baseOrder());
+    t.getPayment.mockResolvedValue({ success: true, status: 'FAILED', amount: { total: 0 } });
+    expect(await confirmOrderPayment('ord1', t.deps)).toEqual({
+      kind: 'NOT_PAID',
+      paymentStatus: 'FAILED',
+      portoneStatus: 'FAILED',
+    });
+    expect(t.db.order.updateMany).toHaveBeenCalledWith({
+      where: { id: 'ord1', paymentStatus: 'PENDING', refundFailedAt: null },
+      data: { paymentStatus: 'FAILED' },
+    });
+  });
+
+  it('환불 실패로 수동 환불 대기 중인 주문은 다시 확정하지 않는다', async () => {
+    const t = setup(baseOrder({ refundFailedAt: NOW, cancelReason: CANCEL_REASON_STOCK_SHORTAGE }));
+    expect(await confirmOrderPayment('ord1', t.deps)).toEqual({
+      kind: 'CLOSED',
+      paymentStatus: 'PENDING',
+      cancelReason: CANCEL_REASON_STOCK_SHORTAGE,
+    });
+    expect(t.getPayment).not.toHaveBeenCalled();
   });
 
   it('결제 확인되면 옵션·상품 재고를 조건부로 차감하고 PAID 로 바꾼다', async () => {
