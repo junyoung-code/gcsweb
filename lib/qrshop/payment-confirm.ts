@@ -133,6 +133,7 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
       paymentStatus: true,
       paymentAmount: true,
       cancelReason: true,
+      refundFailedAt: true,
       orderNumber: { select: { type: true } },
       items: {
         select: {
@@ -149,7 +150,8 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
   if (!order || !order.orderNumber) return { kind: 'NOT_FOUND' };
 
   if (order.paymentStatus === ORDER_PAYMENT_STATUS.PAID) return { kind: 'PAID', alreadyPaid: true };
-  if (!isConfirmable(order.paymentStatus)) {
+  // 재고 부족 환불이 실패해 수동 환불을 기다리는 주문은 다시 확정하지 않는다(고객에게 환불 예정으로 안내됨).
+  if (!isConfirmable(order.paymentStatus) || order.refundFailedAt) {
     return { kind: 'CLOSED', paymentStatus: order.paymentStatus, cancelReason: order.cancelReason };
   }
 
@@ -158,10 +160,16 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
     if (payment.notFound) return { kind: 'NOT_PAID', paymentStatus: order.paymentStatus };
     return { kind: 'LOOKUP_FAILED', code: payment.code, message: payment.message };
   }
-  if (payment.amount?.total !== order.paymentAmount) return { kind: 'AMOUNT_MISMATCH' };
-  if (payment.status?.toUpperCase() !== 'PAID') {
+  const portoneStatus = payment.status?.toUpperCase();
+  if (portoneStatus !== 'PAID') {
+    // PG 승인 실패는 바로 FAILED 로 기록한다. 같은 결제 ID 로 재결제가 가능하므로 이후 PAID 가 오면 다시 확정된다.
+    if (portoneStatus === 'FAILED' && order.paymentStatus === ORDER_PAYMENT_STATUS.PENDING) {
+      await markOrderFailed(db, order.id);
+      return { kind: 'NOT_PAID', paymentStatus: ORDER_PAYMENT_STATUS.FAILED, portoneStatus: payment.status };
+    }
     return { kind: 'NOT_PAID', paymentStatus: order.paymentStatus, portoneStatus: payment.status };
   }
+  if (payment.amount?.total !== order.paymentAmount) return { kind: 'AMOUNT_MISMATCH' };
 
   try {
     const result = await db.$transaction(
@@ -253,16 +261,30 @@ export async function settleStalePendingOrder(
     ...overrides,
   };
 
-  if (order.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING || order.refundFailedAt) return false;
-  if (deps.now().getTime() - order.createdAt.getTime() < PENDING_EXPIRE_MS) return false;
+  if (!isStalePending(order, deps.now())) return false;
 
   const result = await confirmOrderPayment(order.id, deps);
   if (result.kind === 'NOT_PAID') {
-    const expired = await deps.db.order.updateMany({
-      where: { id: order.id, paymentStatus: ORDER_PAYMENT_STATUS.PENDING, refundFailedAt: null },
-      data: { paymentStatus: ORDER_PAYMENT_STATUS.FAILED },
-    });
-    return expired.count > 0;
+    if (result.paymentStatus === ORDER_PAYMENT_STATUS.FAILED) return true;
+    return markOrderFailed(deps.db, order.id);
   }
   return result.kind === 'PAID' || result.kind === 'STOCK_SHORTAGE';
+}
+
+/** 생성 후 PENDING_EXPIRE_MS 가 지난 결제 대기 주문인지. 환불 실패 대기 주문은 제외한다. */
+export function isStalePending(
+  order: { paymentStatus: PaymentStatus; createdAt: Date; refundFailedAt: Date | null },
+  now: Date,
+): boolean {
+  if (order.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING || order.refundFailedAt) return false;
+  return now.getTime() - order.createdAt.getTime() >= PENDING_EXPIRE_MS;
+}
+
+/** 결제 대기 주문을 FAILED 로 바꾼다. 다른 요청이 먼저 상태를 바꿨으면 건드리지 않는다. */
+export async function markOrderFailed(db: Pick<PrismaClient, 'order'>, orderId: string): Promise<boolean> {
+  const updated = await db.order.updateMany({
+    where: { id: orderId, paymentStatus: ORDER_PAYMENT_STATUS.PENDING, refundFailedAt: null },
+    data: { paymentStatus: ORDER_PAYMENT_STATUS.FAILED },
+  });
+  return updated.count > 0;
 }
