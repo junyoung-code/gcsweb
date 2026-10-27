@@ -107,6 +107,8 @@ export async function getPayment(merchantUid: string): Promise<{
   status?: string;
   amount?: { total: number };
   impUid?: string; // 포트원/PG 고유 거래번호
+  /** 결제 건이 PortOne에 없음(HTTP 404). 결제창에서 아직 결제하지 않았거나 이탈한 경우 */
+  notFound?: boolean;
   code?: string;
   message?: string;
 }> {
@@ -137,6 +139,7 @@ export async function getPayment(merchantUid: string): Promise<{
     });
     return {
       success: false,
+      notFound: res.status === 404,
       code: data?.code ?? 'API_ERROR',
       message: data?.message ?? '결제 조회 실패',
     };
@@ -186,6 +189,64 @@ export async function getPayment(merchantUid: string): Promise<{
     status: payload.status,
     amount: hasTotal ? { total } : undefined,
     impUid: typeof impUid === 'string' ? impUid : undefined,
+  };
+}
+
+/**
+ * 결제 취소(환불) V2. POST /payments/{paymentId}/cancel
+ * amount를 생략하면 전액 취소. 이미 취소된 결제(PAYMENT_ALREADY_CANCELLED)는 성공으로 본다(멱등).
+ */
+export async function cancelPayment(params: {
+  paymentId: string;
+  reason: string;
+  amount?: number;
+}): Promise<{
+  success: boolean;
+  alreadyCanceled?: boolean;
+  code?: string;
+  message?: string;
+}> {
+  const secret = getSecret();
+  if (!secret) {
+    return { success: false, code: 'CONFIG_MISSING', message: 'PORTONE_API_SECRET 미설정' };
+  }
+
+  const body: Record<string, unknown> = { reason: params.reason };
+  const storeId = getCheckoutStoreId();
+  if (storeId) body.storeId = storeId;
+  if (params.amount != null) body.amount = params.amount;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/payments/${encodeURIComponent(params.paymentId)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `PortOne ${secret}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    console.error('[PortOne][cancelPayment] request failed', { paymentId: params.paymentId, error });
+    return { success: false, code: 'NETWORK_ERROR', message: '결제 취소 요청 실패' };
+  }
+
+  if (res.ok) return { success: true };
+
+  const data = await res.json().catch(() => ({}));
+  const type = typeof data?.type === 'string' ? data.type : undefined;
+  if (type === 'PAYMENT_ALREADY_CANCELLED') {
+    return { success: true, alreadyCanceled: true };
+  }
+
+  console.error('[PortOne][cancelPayment] HTTP error', {
+    paymentId: params.paymentId,
+    status: res.status,
+    type: type ?? null,
+    message: data?.message ?? null,
+  });
+  return {
+    success: false,
+    code: type ?? 'API_ERROR',
+    message: data?.message ?? '결제 취소 실패',
   };
 }
 
