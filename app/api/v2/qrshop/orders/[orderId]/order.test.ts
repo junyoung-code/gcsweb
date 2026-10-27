@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@/lib/db';
 import { hashGuestToken } from '@/lib/qrshop/guest-token';
-import { settleStalePendingOrder } from '@/lib/qrshop/payment-confirm';
+import { refreshUnconfirmedOrder } from '@/lib/qrshop/payment-confirm';
 import { GET } from './route';
 
 vi.mock('@/lib/db', () => ({
@@ -10,12 +10,12 @@ vi.mock('@/lib/db', () => ({
 }));
 vi.mock('@/lib/qrshop/payment-confirm', () => ({
   CANCEL_REASON_STOCK_SHORTAGE: 'STOCK_SHORTAGE',
-  settleStalePendingOrder: vi.fn(),
+  refreshUnconfirmedOrder: vi.fn(),
 }));
 
 type Fn = ReturnType<typeof vi.fn>;
 const findOrder = prisma.order.findUnique as unknown as Fn;
-const settle = settleStalePendingOrder as unknown as Fn;
+const settle = refreshUnconfirmedOrder as unknown as Fn;
 
 const TOKEN = 'guest-token-1';
 
@@ -97,7 +97,7 @@ describe('GET /api/v2/qrshop/orders/:orderId', () => {
     });
   });
 
-  it('10분 지난 결제 대기 주문은 정리한 뒤 다시 읽은 상태로 응답한다', async () => {
+  it('미확정 주문은 PortOne 확인(늦은 결제 확정) 후 다시 읽은 상태로 응답한다', async () => {
     findOrder.mockResolvedValueOnce(orderRow({ paymentStatus: 'PENDING' })).mockResolvedValueOnce(orderRow());
     settle.mockResolvedValue(true);
 
@@ -107,7 +107,7 @@ describe('GET /api/v2/qrshop/orders/:orderId', () => {
     expect(data).toMatchObject({ paymentStatus: 'PAID', orderNo: 147, failureCode: null });
   });
 
-  it('토큰 검증 전에는 결제 정리를 하지 않는다', async () => {
+  it('토큰 검증 전에는 결제 확인을 하지 않는다', async () => {
     findOrder.mockResolvedValue(orderRow({ paymentStatus: 'PENDING' }));
     await get('wrong-token');
     expect(settle).not.toHaveBeenCalled();
