@@ -172,8 +172,8 @@ model Order {
   orderDate             DateTime    @default(now())
   createdAt             DateTime    @default(now())
   updatedAt             DateTime    @updatedAt
-  productType           Int
-  receiveMethod         Int
+  productType           Int? /// /shop 주문의 상품유형(Fund/BuyNow). QR샵 주문은 null
+  receiveMethod         Int? /// /shop 주문의 수령방법. QR샵 주문은 null
   receiverName          String?
   receiverPhone         String?
   deliveryZipCode       String?
@@ -196,9 +196,13 @@ model Order {
   buyerGuestTokenHash   String?     @db.VarChar(128)
   bagOption             Boolean     @default(false)
   impUid                String?     @unique
+  canceledAt            DateTime? /// 취소(환불) 시각
+  cancelReason          String? /// 취소 사유 (예: STOCK_SHORTAGE)
+  refundFailedAt        DateTime? /// 환불 호출 실패 시각. 값이 있으면 수동 환불 필요
   inquiries             Inquiry[]
   user                  User?       @relation(fields: [userId], references: [id])
   items                 OrderItem[]
+  orderNumber           OrderNumber?
 
   @@unique([orderDateKey, productType, orderSeq])
   @@index([userId])
@@ -222,21 +226,38 @@ model OrderSequence {
   @@id([orderDateKey, productType])
 }
 
+/// QR샵 주문번호. 주문 1건당 1행이며 (상점, 일자(KST)) 안에서 1부터 순번을 매긴다
+model OrderNumber {
+  orderId      String    @id
+  orderNo      Int /// 상점·일별 순번 (1부터, 자릿수 고정 없음)
+  type         OrderType /// 주문 유형 (QR샵 현장 판매 주문은 ONSITE)
+  storeId      String
+  orderTimeKey String /// 주문 일자(KST) YYMMDD
+  createdAt    DateTime  @default(now())
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  store        Store     @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
+
+  @@unique([storeId, orderTimeKey, orderNo])
+  @@index([storeId, orderTimeKey])
+}
+
 model OrderItem {
-  id              String               @id @default(cuid())
-  orderId         String
-  productId       String
-  quantity        Int
-  price           Int
-  optionData      Json?
-  createdAt       DateTime             @default(now())
-  productType     Int
-  onsiteProductId String?
-  onsiteOptionId  String?
-  order           Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product         Product              @relation(fields: [productId], references: [id])
-  onsiteProduct   OnsiteProduct?       @relation(fields: [onsiteProductId], references: [productId], onDelete: SetNull)
-  onsiteOption    OnsiteProductOption? @relation(fields: [onsiteOptionId], references: [optionId], onDelete: SetNull)
+  id                String               @id @default(cuid())
+  orderId           String
+  productId         String? /// /shop 상품. QR샵 주문 항목은 null
+  quantity          Int
+  price             Int /// 단가 (주문 시점)
+  optionData        Json? /// 레거시. 새 로직은 사용하지 않음
+  createdAt         DateTime             @default(now())
+  productType       Int
+  onsiteProductId   String?
+  onsiteOptionId    String?
+  onsiteProductName String? /// 주문 시점 상품명 (상품이 수정·삭제돼도 유지)
+  onsiteOptionName  String? /// 주문 시점 옵션명 (옵션 미사용이면 null)
+  order             Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product           Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
+  onsiteProduct     OnsiteProduct?       @relation(fields: [onsiteProductId], references: [productId], onDelete: SetNull)
+  onsiteOption      OnsiteProductOption? @relation(fields: [onsiteOptionId], references: [optionId], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
@@ -271,6 +292,7 @@ model Store {
   user       User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   categories OnsiteProductCategory[]
   products   OnsiteProduct[]
+  orderNumbers OrderNumber[]
 }
 
 /// QRshop 상점별 상품 카테고리. 상품은 카테고리를 갖지 않을 수 있음
@@ -533,4 +555,9 @@ enum PaymentMethod {
 enum ReceiptStatus {
   NOT_RECEIVED /// 미수령
   RECEIVED /// 수령완료
+}
+
+enum OrderType {
+  PRE_ORDER /// 사전주문(추후 구현)
+  ONSITE /// 현장판매 (QR샵 주문)
 }
