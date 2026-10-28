@@ -113,7 +113,8 @@ describe('응답 변환', () => {
       storeSlug: 'nirvanaexpress',
       storeUrl: 'https://example.com/QRshop/@nirvanaexpress',
     });
-    expect(toStoreDetail(store).createdAt).toBe('2026-10-02T00:00:00.000Z');
+    expect(toStoreDetail(store, true)).toMatchObject({ createdAt: '2026-10-02T00:00:00.000Z', hasSalesHistory: true });
+    expect(toStoreDetail(store, false).hasSalesHistory).toBe(false);
   });
 });
 
