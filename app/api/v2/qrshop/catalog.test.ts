@@ -65,7 +65,7 @@ describe('GET /api/v2/qrshop', () => {
     expect(await res.json()).toMatchObject({ code: 'NOT_FOUND', message: '존재하지 않는 상점' });
   });
 
-  it('상점·카테고리·상품을 명세 형태로 내려주고 상점 이미지와 재고 수량은 빼고 준다', async () => {
+  it('상점·카테고리·상품을 명세 형태로 내려주고 상점 이미지는 빼고 재고 수량(stock)은 함께 준다', async () => {
     findStore.mockResolvedValue(
       storeRow(
         [
@@ -95,9 +95,10 @@ describe('GET /api/v2/qrshop', () => {
         categoryId: 'c1',
         hasOption: true,
         soldOut: false,
+        stock: null,
         options: [
-          { optionId: 'o1', name: '옵션 o1', surcharge: 1000, soldOut: false },
-          { optionId: 'o2', name: '옵션 o2', surcharge: 0, soldOut: true },
+          { optionId: 'o1', name: '옵션 o1', surcharge: 1000, stock: 2, soldOut: false },
+          { optionId: 'o2', name: '옵션 o2', surcharge: 0, stock: 0, soldOut: true },
         ],
       },
       {
@@ -108,6 +109,7 @@ describe('GET /api/v2/qrshop', () => {
         categoryId: null,
         hasOption: false,
         soldOut: false,
+        stock: 3,
         options: [],
       },
     ]);
