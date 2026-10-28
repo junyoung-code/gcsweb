@@ -79,12 +79,12 @@ describe('GET /api/v2/qrshop/orders/:orderId', () => {
   it.each([
     [{ paymentStatus: 'PENDING' }, 'PAYMENT_NOT_COMPLETED', '결제가 완료되지 않았습니다.'],
     [{ paymentStatus: 'FAILED' }, 'PAYMENT_FAILED', '결제가 실패되었습니다.'],
-    [{ paymentStatus: 'CANCELED', cancelReason: 'STOCK_SHORTAGE' }, 'STOCK_SHORTAGE', '품절로 결제가 취소되었습니다.'],
+    [{ paymentStatus: 'CANCELED', cancelReason: 'STOCK_SHORTAGE' }, 'STOCK_SHORTAGE', '해당 상품 품절로 전체 결제 취소 (품절 환불 호출 성공)'],
     [{ paymentStatus: 'CANCELED', cancelReason: 'OTHER' }, 'PAYMENT_CANCELED', '결제가 취소되었습니다.'],
     [
       { paymentStatus: 'PENDING', cancelReason: 'STOCK_SHORTAGE', refundFailedAt: new Date() },
       'REFUND_PENDING',
-      '품절로 결제가 취소되었습니다. 결제된 금액은 환불 예정입니다.',
+      '해당 상품 품절로 전체 결제 취소 (품절 환불 호출 실패)',
     ],
   ])('결제 완료가 아니면 200 + failureCode, 주문번호는 null (%o)', async (overrides, code, message) => {
     findOrder.mockResolvedValue(orderRow(overrides));

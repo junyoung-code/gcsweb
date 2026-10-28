@@ -25,7 +25,7 @@ function toFailure(order: {
   if (order.refundFailedAt) {
     return {
       failureCode: 'REFUND_PENDING',
-      failureMessage: '품절로 결제가 취소되었습니다. 결제된 금액은 환불 예정입니다.',
+      failureMessage: '해당 상품 품절로 전체 결제 취소 (품절 환불 호출 실패)',
     };
   }
 
@@ -34,7 +34,7 @@ function toFailure(order: {
       return { failureCode: 'PAYMENT_FAILED', failureMessage: '결제가 실패되었습니다.' };
     case ORDER_PAYMENT_STATUS.CANCELED:
       return order.cancelReason === CANCEL_REASON_STOCK_SHORTAGE
-        ? { failureCode: 'STOCK_SHORTAGE', failureMessage: '품절로 결제가 취소되었습니다.' }
+        ? { failureCode: 'STOCK_SHORTAGE', failureMessage: '해당 상품 품절로 전체 결제 취소 (품절 환불 호출 성공)' }
         : { failureCode: 'PAYMENT_CANCELED', failureMessage: '결제가 취소되었습니다.' };
     default:
       return { failureCode: 'PAYMENT_NOT_COMPLETED', failureMessage: '결제가 완료되지 않았습니다.' };
