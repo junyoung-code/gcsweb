@@ -253,7 +253,8 @@ model OrderItem {
   onsiteOptionId    String?
   onsiteProductName String? /// 주문 시점 상품명 (상품이 수정·삭제돼도 유지)
   onsiteOptionName  String? /// 주문 시점 옵션명 (옵션 미사용이면 null)
-  order             Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stockShortage     Boolean              @default(false) /// 결제 완료 후 재고 부족으로 취소된 항목 (품절 환불 화면에 품절 상품만 보여주기 위해 추가)
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product           Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   onsiteProduct     OnsiteProduct?       @relation(fields: [onsiteProductId], references: [productId], onDelete: SetNull)
   onsiteOption      OnsiteProductOption? @relation(fields: [onsiteOptionId], references: [optionId], onDelete: SetNull)
