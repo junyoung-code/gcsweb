@@ -253,7 +253,8 @@ model OrderItem {
   onsiteOptionId    String?
   onsiteProductName String? /// 주문 시점 상품명 (상품이 수정·삭제돼도 유지)
   onsiteOptionName  String? /// 주문 시점 옵션명 (옵션 미사용이면 null)
-  order             Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  stockShortage     Boolean              @default(false) /// 결제 완료 후 재고 부족으로 취소된 항목 (품절 환불 화면에 품절 상품만 보여주기 위해 추가)
+  order             Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product           Product?             @relation(fields: [productId], references: [id], onDelete: SetNull)
   onsiteProduct     OnsiteProduct?       @relation(fields: [onsiteProductId], references: [productId], onDelete: SetNull)
   onsiteOption      OnsiteProductOption? @relation(fields: [onsiteOptionId], references: [optionId], onDelete: SetNull)
@@ -319,7 +320,6 @@ model OnsiteProduct {
   initStock      Int /// 최초 재고(0 이상, DB CHECK로 강제). 옵션 사용 시 옵션 initStock 합계
   currentStock   Int /// 판매 가능 재고(0 이상, DB CHECK로 강제, 결제 확정 시 차감). 옵션 사용 시 옵션 currentStock 합계
   imageUrl       String? /// 상품 대표 이미지
-  legacyQrItemId String?                @unique /// item.json/FairShopProductTable 이관 추적용(임시). 이관 검증 끝나면 삭제 예정
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
   store          Store                  @relation(fields: [storeId], references: [storeId], onDelete: Cascade)
@@ -339,7 +339,7 @@ model OnsiteProductOption {
   surcharge      Int           @default(0) /// 기본가에 더해지는 추가금(0 이상, 절대가격 아님, DB CHECK로 강제)
   initStock      Int /// 최초 재고(0 이상, DB CHECK로 강제)
   currentStock   Int /// 판매 가능 재고(0 이상, DB CHECK로 강제, 결제 확정 시 차감)
-  legacyQrItemId String?       @unique /// item.json 이관 추적용(임시). 이관 검증 끝나면 삭제 예정.
+  createdAt      DateTime      @default(now()) /// 등록 시각. 옵션 노출 순서(오래된 등록이 위)의 기준, 같으면 optionId 순
   product        OnsiteProduct @relation(fields: [productId], references: [productId], onDelete: Cascade)
   orderItems     OrderItem[]
 

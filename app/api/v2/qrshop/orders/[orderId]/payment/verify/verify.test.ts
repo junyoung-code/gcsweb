@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { prisma } from '@/lib/db';
 import { hashGuestToken } from '@/lib/qrshop/guest-token';
-import { confirmOrderPayment, markOrderFailed } from '@/lib/qrshop/payment-confirm';
+import { confirmOrderPayment } from '@/lib/qrshop/payment-confirm';
 import { POST } from './route';
 
 vi.mock('@/lib/db', () => ({
@@ -11,22 +11,17 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/qrshop/payment-confirm', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/qrshop/payment-confirm')>()),
   confirmOrderPayment: vi.fn(),
-  markOrderFailed: vi.fn(),
 }));
 
 type Fn = ReturnType<typeof vi.fn>;
 const findOrder = prisma.order.findUnique as unknown as Fn;
 const confirm = confirmOrderPayment as unknown as Fn;
-const markFailed = markOrderFailed as unknown as Fn;
 
 const TOKEN = 'guest-token-1';
 
 const orderRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'ord1',
   buyerGuestTokenHash: hashGuestToken(TOKEN),
-  paymentStatus: 'PENDING',
-  createdAt: new Date(),
-  refundFailedAt: null,
   orderNumber: { orderNo: 147 },
   ...overrides,
 });
@@ -45,7 +40,6 @@ const soldOutItems = [{ productId: 'p1', optionId: 'o1', name: '키링', optionN
 beforeEach(() => {
   vi.resetAllMocks();
   findOrder.mockResolvedValue(orderRow());
-  markFailed.mockResolvedValue(true);
 });
 
 describe('POST /api/v2/qrshop/orders/:orderId/payment/verify', () => {
@@ -67,22 +61,14 @@ describe('POST /api/v2/qrshop/orders/:orderId/payment/verify', () => {
     expect((await res.json()).data).toEqual({ verified: true, paymentStatus: 'PAID' });
   });
 
-  it('결제 전이면 verified:false + 현재 상태', async () => {
+  it('결제 전이면 verified:false + 현재 상태 (시간이 지나도 PENDING 유지)', async () => {
     confirm.mockResolvedValue({ kind: 'NOT_PAID', paymentStatus: 'PENDING' });
     expect((await (await verify()).json()).data).toEqual({ verified: false, paymentStatus: 'PENDING' });
-    expect(markFailed).not.toHaveBeenCalled();
   });
 
   it('PG 승인 실패로 FAILED 가 됐으면 그대로 FAILED', async () => {
     confirm.mockResolvedValue({ kind: 'NOT_PAID', paymentStatus: 'FAILED', portoneStatus: 'FAILED' });
     expect((await (await verify()).json()).data).toEqual({ verified: false, paymentStatus: 'FAILED' });
-  });
-
-  it('생성 10분이 지난 결제 대기 주문이 결제 전이면 FAILED 로 바꾼다', async () => {
-    findOrder.mockResolvedValue(orderRow({ createdAt: new Date(Date.now() - 11 * 60 * 1000) }));
-    confirm.mockResolvedValue({ kind: 'NOT_PAID', paymentStatus: 'PENDING' });
-    expect((await (await verify()).json()).data).toEqual({ verified: false, paymentStatus: 'FAILED' });
-    expect(markFailed).toHaveBeenCalledWith(prisma, 'ord1');
   });
 
   it('결제 후 재고 부족이면 409 STOCK_SHORTAGE + soldOutItems', async () => {

@@ -2,9 +2,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ prisma: {} }));
 
-import { CANCEL_REASON_STOCK_SHORTAGE, PENDING_EXPIRE_MS, confirmOrderPayment, settleStalePendingOrder } from './payment-confirm';
+import {
+  CANCEL_REASON_STOCK_SHORTAGE,
+  PAYMENT_CHECK_WINDOW_MS,
+  confirmOrderPayment,
+  refreshUnconfirmedOrder,
+} from './payment-confirm';
 
 type Item = {
+  id: string;
   quantity: number;
   onsiteProductId: string | null;
   onsiteOptionId: string | null;
@@ -13,6 +19,7 @@ type Item = {
 };
 
 const optionItem: Item = {
+  id: 'oi1',
   quantity: 2,
   onsiteProductId: 'p1',
   onsiteOptionId: 'o1',
@@ -20,6 +27,7 @@ const optionItem: Item = {
   onsiteOptionName: '4일차',
 };
 const plainItem: Item = {
+  id: 'oi2',
   quantity: 1,
   onsiteProductId: 'p2',
   onsiteOptionId: null,
@@ -59,6 +67,7 @@ function setup(order: unknown, opts: { currentStatus?: string; optionCount?: num
   };
   const db = {
     order: { findUnique: vi.fn().mockResolvedValue(order), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    orderItem: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const getPayment = vi.fn().mockResolvedValue({ success: true, status: 'PAID', amount: { total: 12000 }, impUid: 'imp_1' });
@@ -197,6 +206,11 @@ describe('confirmOrderPayment', () => {
       soldOutItems: [{ productId: 'p1', optionId: 'o1', name: '키캡키링 A', optionName: '4일차', availableQuantity: 1 }],
     });
     expect(t.tx.order.update).not.toHaveBeenCalled();
+    // 품절이었던 항목(옵션 항목)만 표시하고 재고가 충분했던 항목은 건드리지 않는다.
+    expect(t.db.orderItem.updateMany).toHaveBeenCalledWith({
+      where: { orderId: 'ord1', id: { in: ['oi1'] } },
+      data: { stockShortage: true },
+    });
     expect(t.cancelPayment).toHaveBeenCalledWith(expect.objectContaining({ paymentId: 'ord1' }));
     expect(t.db.order.updateMany).toHaveBeenCalledWith({
       where: { id: 'ord1', paymentStatus: { in: ['PENDING', 'FAILED'] } },
@@ -239,6 +253,10 @@ describe('confirmOrderPayment', () => {
     spy.mockRestore();
 
     expect(result).toMatchObject({ kind: 'STOCK_SHORTAGE', refunded: false });
+    expect(t.db.orderItem.updateMany).toHaveBeenCalledWith({
+      where: { orderId: 'ord1', id: { in: ['oi1'] } },
+      data: { stockShortage: true },
+    });
     expect(t.db.order.updateMany).toHaveBeenCalledWith({
       where: { id: 'ord1', paymentStatus: { in: ['PENDING', 'FAILED'] } },
       data: { refundFailedAt: NOW, cancelReason: CANCEL_REASON_STOCK_SHORTAGE },
@@ -253,57 +271,79 @@ describe('confirmOrderPayment', () => {
   });
 });
 
-describe('settleStalePendingOrder', () => {
-  const stale = (overrides: Record<string, unknown> = {}) => ({
+describe('refreshUnconfirmedOrder (조회 시 미확정 주문 확인)', () => {
+  const unconfirmed = (overrides: Record<string, unknown> = {}) => ({
     id: 'ord1',
     paymentStatus: 'PENDING' as const,
-    createdAt: new Date(NOW.getTime() - PENDING_EXPIRE_MS - 1),
+    createdAt: new Date(NOW.getTime() - 60 * 60 * 1000),
     refundFailedAt: null,
     ...overrides,
   });
 
-  it('10분이 안 지났으면 PortOne 을 조회하지 않는다', async () => {
+  it('생성 후 24시간이 지났으면 PortOne 을 조회하지 않는다', async () => {
     const t = setup(baseOrder());
-    const fresh = stale({ createdAt: new Date(NOW.getTime() - PENDING_EXPIRE_MS + 1000) });
-    expect(await settleStalePendingOrder(fresh, t.deps)).toBe(false);
+    const old = unconfirmed({ createdAt: new Date(NOW.getTime() - PAYMENT_CHECK_WINDOW_MS) });
+    expect(await refreshUnconfirmedOrder(old, t.deps)).toBe(false);
     expect(t.getPayment).not.toHaveBeenCalled();
   });
 
-  it('PENDING 이 아니거나 환불 실패 대기 주문이면 건드리지 않는다', async () => {
+  it('24시간 안이면 10분이 지나도 계속 확인한다', async () => {
     const t = setup(baseOrder());
-    expect(await settleStalePendingOrder(stale({ paymentStatus: 'PAID' }), t.deps)).toBe(false);
-    expect(await settleStalePendingOrder(stale({ refundFailedAt: NOW }), t.deps)).toBe(false);
+    t.getPayment.mockResolvedValue({ success: false, notFound: true });
+    const inWindow = unconfirmed({ createdAt: new Date(NOW.getTime() - PAYMENT_CHECK_WINDOW_MS + 1000) });
+    expect(await refreshUnconfirmedOrder(inWindow, t.deps)).toBe(false);
+    expect(t.getPayment).toHaveBeenCalledTimes(1);
+  });
+
+  it('이미 PAID·CANCELED 이거나 환불 실패 대기 주문이면 건드리지 않는다', async () => {
+    const t = setup(baseOrder());
+    expect(await refreshUnconfirmedOrder(unconfirmed({ paymentStatus: 'PAID' }), t.deps)).toBe(false);
+    expect(await refreshUnconfirmedOrder(unconfirmed({ paymentStatus: 'CANCELED' }), t.deps)).toBe(false);
+    expect(await refreshUnconfirmedOrder(unconfirmed({ refundFailedAt: NOW }), t.deps)).toBe(false);
     expect(t.getPayment).not.toHaveBeenCalled();
   });
 
-  it('10분 지났고 PortOne 에서 결제됐으면 확정한다', async () => {
-    const t = setup(baseOrder());
-    expect(await settleStalePendingOrder(stale(), t.deps)).toBe(true);
+  it.each(['PENDING', 'FAILED'] as const)('%s 주문이 PortOne 에서 결제됐으면 PAID 로 확정한다 (늦은 결제)', async (paymentStatus) => {
+    const t = setup(baseOrder({ paymentStatus }), { currentStatus: paymentStatus });
+    expect(await refreshUnconfirmedOrder(unconfirmed({ paymentStatus }), t.deps)).toBe(true);
     expect(t.tx.order.update).toHaveBeenCalledWith({
       where: { id: 'ord1' },
       data: { paymentStatus: 'PAID', impUid: 'imp_1' },
     });
-    expect(t.db.order.updateMany).not.toHaveBeenCalled();
   });
 
   it.each([
     ['결제 건 없음(결제창 이탈)', { success: false, notFound: true }],
     ['결제창만 열고 미결제', { success: true, status: 'READY', amount: { total: 12000 } }],
-    ['PG 승인 실패', { success: true, status: 'FAILED', amount: { total: 12000 } }],
-  ])('10분 지났고 %s 이면 FAILED 로 바꾼다', async (_label, payment) => {
+  ])('%s 이면 상태를 바꾸지 않는다 (PENDING 유지)', async (_label, payment) => {
     const t = setup(baseOrder());
     t.getPayment.mockResolvedValue(payment);
-    expect(await settleStalePendingOrder(stale(), t.deps)).toBe(true);
+    expect(await refreshUnconfirmedOrder(unconfirmed(), t.deps)).toBe(false);
+    expect(t.db.order.updateMany).not.toHaveBeenCalled();
+    expect(t.tx.order.update).not.toHaveBeenCalled();
+  });
+
+  it('PG 승인 실패가 확인되면 FAILED 로 기록하고 true', async () => {
+    const t = setup(baseOrder());
+    t.getPayment.mockResolvedValue({ success: true, status: 'FAILED', amount: { total: 12000 } });
+    expect(await refreshUnconfirmedOrder(unconfirmed(), t.deps)).toBe(true);
     expect(t.db.order.updateMany).toHaveBeenCalledWith({
       where: { id: 'ord1', paymentStatus: 'PENDING', refundFailedAt: null },
       data: { paymentStatus: 'FAILED' },
     });
   });
 
+  it('이미 FAILED 인 주문이 여전히 미결제면 바꾸지 않는다', async () => {
+    const t = setup(baseOrder({ paymentStatus: 'FAILED' }));
+    t.getPayment.mockResolvedValue({ success: true, status: 'FAILED', amount: { total: 12000 } });
+    expect(await refreshUnconfirmedOrder(unconfirmed({ paymentStatus: 'FAILED' }), t.deps)).toBe(false);
+    expect(t.db.order.updateMany).not.toHaveBeenCalled();
+  });
+
   it('PortOne 조회가 실패하면 상태를 바꾸지 않는다', async () => {
     const t = setup(baseOrder());
     t.getPayment.mockResolvedValue({ success: false, code: 'API_ERROR', message: 'boom' });
-    expect(await settleStalePendingOrder(stale(), t.deps)).toBe(false);
+    expect(await refreshUnconfirmedOrder(unconfirmed(), t.deps)).toBe(false);
     expect(t.db.order.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
 import { apiError, apiErrors, apiSuccess } from '@/lib/api-response';
 import { hasProductPaidSale } from '@/lib/qrshop/sales-history';
@@ -51,9 +52,9 @@ const PRODUCT_SELECT = {
   category: { select: { categoryId: true, name: true } },
   options: {
     select: { optionId: true, name: true, surcharge: true, currentStock: true },
-    orderBy: { name: 'asc' },
+    orderBy: [{ createdAt: 'asc' }, { optionId: 'asc' }],
   },
-} as const;
+} satisfies Prisma.OnsiteProductSelect;
 
 type ProductRow = {
   productId: string;

@@ -20,6 +20,24 @@ export async function hasProductPaidSale(productId: string, client: Client = pri
   return line !== null;
 }
 
+/**
+ * 결제완료된 주문이 이 상점에 한 번이라도 있었는지.
+ * 상품 참조(onsiteProductId)가 끊긴 항목도 놓치지 않도록 주문번호(OrderNumber)의 상점으로도 찾는다.
+ */
+export async function hasStorePaidSale(storeId: string, client: Client = prisma): Promise<boolean> {
+  const byOrderNumber = await client.orderItem.findFirst({
+    where: { order: { ...paidOrder, orderNumber: { storeId } } },
+    select: { id: true },
+  });
+  if (byOrderNumber) return true;
+
+  const byProduct = await client.orderItem.findFirst({
+    where: { onsiteProduct: { storeId }, order: paidOrder },
+    select: { id: true },
+  });
+  return byProduct !== null;
+}
+
 /** 결제완료된 주문에 한 번이라도 팔린 상품 id 집합. 상품이 없으면 질의하지 않는다. */
 export async function findPaidSoldProductIds(
   productIds: string[],

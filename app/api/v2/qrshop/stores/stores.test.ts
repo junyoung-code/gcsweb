@@ -6,12 +6,17 @@ import { prisma } from '@/lib/db';
 import { GET as getCheckId } from './check-id/route';
 import { GET as getMe } from './me/route';
 import { POST } from './route';
-import { GET as getStore, PATCH } from './[storeId]/route';
+import { DELETE, GET as getStore, PATCH } from './[storeId]/route';
+import { deleteStoreWithoutSales } from '@/lib/qrshop/store-delete';
 import { GET as getQrCode } from './[storeId]/qrcode/route';
 
 vi.mock('@/lib/db', () => ({
-  prisma: { store: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() } },
+  prisma: {
+    store: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
+    $transaction: vi.fn(),
+  },
 }));
+vi.mock('@/lib/qrshop/store-delete', () => ({ deleteStoreWithoutSales: vi.fn() }));
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 
@@ -169,5 +174,43 @@ describe('GET /api/v2/qrshop/stores/{storeId}/qrcode', () => {
   it('본인 상점이 아니면 404', async () => {
     store.findFirst.mockResolvedValue(null);
     expect((await getQrCode(new Request('http://localhost/x'), ctx())).status).toBe(404);
+  });
+});
+
+describe('DELETE /api/v2/qrshop/stores/{storeId}', () => {
+  const remove = deleteStoreWithoutSales as unknown as ReturnType<typeof vi.fn>;
+  const transaction = prisma.$transaction as unknown as ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({}));
+  });
+
+  it('비로그인은 401', async () => {
+    session.mockResolvedValue(null);
+    expect((await DELETE(new Request('http://localhost/api'), ctx())).status).toBe(401);
+  });
+
+  it('내 상점이 아니면 404 (존재 여부를 숨긴다)', async () => {
+    store.findFirst.mockResolvedValue(null);
+    const res = await DELETE(new Request('http://localhost/api'), ctx('other'));
+    expect(res.status).toBe(404);
+    expect(store.findFirst.mock.calls[0][0].where).toEqual({ storeId: 'other', userId: 'u1' });
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it('판매이력이 있으면 409 STORE_HAS_SALES', async () => {
+    store.findFirst.mockResolvedValue({ storeId: 's1' });
+    remove.mockResolvedValue('HAS_SALES');
+    const res = await DELETE(new Request('http://localhost/api'), ctx());
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ code: 'STORE_HAS_SALES', message: '판매 이력이 있는 상점' });
+  });
+
+  it('판매이력이 없으면 삭제하고 storeId를 돌려준다', async () => {
+    store.findFirst.mockResolvedValue({ storeId: 's1' });
+    remove.mockResolvedValue('DELETED');
+    const res = await DELETE(new Request('http://localhost/api'), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: 'success', data: { storeId: 's1' } });
   });
 });

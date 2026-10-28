@@ -28,8 +28,12 @@ function isConfirmable(status: PaymentStatus): boolean {
   return CONFIRMABLE_STATUSES.includes(status);
 }
 
-/** 결제 대기 주문을 결제창 이탈로 보고 FAILED 로 바꾸는 기준 시간(주문 생성 후). */
-export const PENDING_EXPIRE_MS = 10 * 60 * 1000;
+/**
+ * 주문 조회 시 미확정 주문의 결제 여부를 PortOne 에 다시 확인하는 기간(주문 생성 후).
+ * 결제창 이탈·늦은 결제(앱카드·간편결제 인증 등)는 PENDING 으로 두고, 이 기간 안에 결제가 오면 PAID 로 확정한다.
+ * 기간이 지나면 조회만으로는 확인하지 않는다(PortOne 호출이 무한정 반복되지 않도록). 웹훅·결제 검증은 기간과 무관하다.
+ */
+export const PAYMENT_CHECK_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export type ConfirmResult =
   | { kind: 'PAID'; alreadyPaid: boolean }
@@ -50,6 +54,7 @@ export type ConfirmDeps = {
 };
 
 type StockItem = {
+  id: string;
   quantity: number;
   onsiteProductId: string | null;
   onsiteOptionId: string | null;
@@ -57,8 +62,11 @@ type StockItem = {
   onsiteOptionName: string | null;
 };
 
+/** 재고가 모자란 주문 항목: 응답용 정보(`soldOut`)와 품절 표시를 남길 OrderItem id. */
+type Shortage = { orderItemId: string; soldOut: SoldOutItem };
+
 class StockShortageError extends Error {
-  constructor(readonly soldOutItems: SoldOutItem[]) {
+  constructor(readonly shortages: Shortage[]) {
     super(CANCEL_REASON_STOCK_SHORTAGE);
   }
 }
@@ -67,16 +75,19 @@ class StockShortageError extends Error {
  * 항목별로 재고를 조건부 차감한다(`현재 재고 >= 수량`). 옵션 상품은 옵션과 상품 재고(= 옵션 합계)를 함께 줄인다.
  * 상품·옵션이 삭제돼 FK 가 비어 있는 항목은 품절로 본다. 모자란 항목을 모아서 돌려준다(호출 쪽이 롤백한다).
  */
-async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]): Promise<SoldOutItem[]> {
-  const soldOut: SoldOutItem[] = [];
+async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]): Promise<Shortage[]> {
+  const soldOut: Shortage[] = [];
 
   for (const item of items) {
-    const shortage = (availableQuantity: number): SoldOutItem => ({
-      productId: item.onsiteProductId,
-      optionId: item.onsiteOptionId,
-      name: item.onsiteProductName ?? '',
-      optionName: item.onsiteOptionName,
-      availableQuantity: Math.max(availableQuantity, 0),
+    const shortage = (availableQuantity: number): Shortage => ({
+      orderItemId: item.id,
+      soldOut: {
+        productId: item.onsiteProductId,
+        optionId: item.onsiteOptionId,
+        name: item.onsiteProductName ?? '',
+        optionName: item.onsiteOptionName,
+        availableQuantity: Math.max(availableQuantity, 0),
+      },
     });
 
     const deletedOption = item.onsiteOptionName !== null && item.onsiteOptionId === null;
@@ -137,6 +148,7 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
       orderNumber: { select: { type: true } },
       items: {
         select: {
+          id: true,
           quantity: true,
           onsiteProductId: true,
           onsiteOptionId: true,
@@ -203,16 +215,26 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
     return result;
   } catch (error) {
     if (!(error instanceof StockShortageError)) throw error;
-    return refundForStockShortage(deps, order.id, error.soldOutItems);
+    return refundForStockShortage(deps, order.id, error.shortages);
   }
 }
 
-/** 재고 부족으로 확정하지 못한 결제를 전액 환불하고 주문을 취소 처리한다. */
+/**
+ * 재고 부족으로 확정하지 못한 결제를 전액 환불하고 주문을 취소 처리한다.
+ * 품절 항목은 OrderItem.stockShortage 로 남긴다 — 결제 후 품절 환불 화면은 품절 상품만 보여줘야 해서
+ * 주문 조회(재진입·웹훅이 먼저 처리한 경우 포함)에서도 어느 항목이 품절이었는지 알 수 있어야 한다.
+ */
 async function refundForStockShortage(
   deps: ConfirmDeps,
   orderId: string,
-  soldOutItems: SoldOutItem[],
+  shortages: Shortage[],
 ): Promise<ConfirmResult> {
+  const soldOutItems = shortages.map((shortage) => shortage.soldOut);
+  await deps.db.orderItem.updateMany({
+    where: { orderId, id: { in: shortages.map((shortage) => shortage.orderItemId) } },
+    data: { stockShortage: true },
+  });
+
   const refund = await deps.cancelPayment({ paymentId: orderId, reason: REFUND_REASON_STOCK_SHORTAGE });
   const now = deps.now();
 
@@ -241,15 +263,16 @@ async function refundForStockShortage(
 }
 
 /**
- * 결제창 이탈 판정. 주문 조회·결제 검증에서 먼저 호출한다(크론 없이 조회 시점에 판정).
+ * 주문 조회에서 먼저 호출하는 미확정 주문 확인(크론 없이 조회 시점에 반영).
  *
- * 생성 후 PENDING_EXPIRE_MS 가 지난 PENDING 주문이면 PortOne 에 실제 결제 여부를 확인한다.
- * 결제됐으면 확정(confirmOrderPayment)하고, 결제 전이면 FAILED 로 바꾼다. 조회 실패·금액 불일치는 그대로 둔다.
- * 환불 실패로 수동 처리 대기 중인 주문(refundFailedAt)은 건드리지 않는다.
+ * 생성 후 PAYMENT_CHECK_WINDOW_MS 안의 PENDING·FAILED 주문이면 PortOne 에 실제 결제 여부를 확인하고,
+ * 결제됐으면 확정(confirmOrderPayment)한다. 결제 전이면 아무것도 바꾸지 않는다(타임아웃으로 FAILED 를 만들지 않는다).
+ * PG 승인 실패가 확인된 경우만 FAILED 로 기록된다(confirmOrderPayment 가 처리).
+ * 조회 실패·금액 불일치는 그대로 둔다. 환불 실패로 수동 처리 대기 중인 주문(refundFailedAt)은 건드리지 않는다.
  *
  * 상태가 바뀌었으면 true 를 돌려준다(호출 쪽이 주문을 다시 읽는다).
  */
-export async function settleStalePendingOrder(
+export async function refreshUnconfirmedOrder(
   order: { id: string; paymentStatus: PaymentStatus; createdAt: Date; refundFailedAt: Date | null },
   overrides: Partial<ConfirmDeps> = {},
 ): Promise<boolean> {
@@ -261,27 +284,32 @@ export async function settleStalePendingOrder(
     ...overrides,
   };
 
-  if (!isStalePending(order, deps.now())) return false;
+  if (!isPaymentCheckable(order, deps.now())) return false;
 
   const result = await confirmOrderPayment(order.id, deps);
-  if (result.kind === 'NOT_PAID') {
-    if (result.paymentStatus === ORDER_PAYMENT_STATUS.FAILED) return true;
-    return markOrderFailed(deps.db, order.id);
+  switch (result.kind) {
+    case 'NOT_PAID':
+      return result.paymentStatus !== order.paymentStatus;
+    case 'PAID':
+    case 'STOCK_SHORTAGE':
+    case 'CLOSED': // 확인하는 사이 다른 요청이 상태를 바꿨다
+      return true;
+    default:
+      return false;
   }
-  return result.kind === 'PAID' || result.kind === 'STOCK_SHORTAGE';
 }
 
-/** 생성 후 PENDING_EXPIRE_MS 가 지난 결제 대기 주문인지. 환불 실패 대기 주문은 제외한다. */
-export function isStalePending(
+/** 조회 시 PortOne 에 확인할 주문인지: 미확정(PENDING·FAILED)이고, 환불 실패 대기가 아니며, 생성 후 24시간 안. */
+export function isPaymentCheckable(
   order: { paymentStatus: PaymentStatus; createdAt: Date; refundFailedAt: Date | null },
   now: Date,
 ): boolean {
-  if (order.paymentStatus !== ORDER_PAYMENT_STATUS.PENDING || order.refundFailedAt) return false;
-  return now.getTime() - order.createdAt.getTime() >= PENDING_EXPIRE_MS;
+  if (!isConfirmable(order.paymentStatus) || order.refundFailedAt) return false;
+  return now.getTime() - order.createdAt.getTime() < PAYMENT_CHECK_WINDOW_MS;
 }
 
-/** 결제 대기 주문을 FAILED 로 바꾼다. 다른 요청이 먼저 상태를 바꿨으면 건드리지 않는다. */
-export async function markOrderFailed(db: Pick<PrismaClient, 'order'>, orderId: string): Promise<boolean> {
+/** 결제 대기 주문을 FAILED 로 바꾼다(PG 승인 실패 확인 시). 다른 요청이 먼저 상태를 바꿨으면 건드리지 않는다. */
+async function markOrderFailed(db: Pick<PrismaClient, 'order'>, orderId: string): Promise<boolean> {
   const updated = await db.order.updateMany({
     where: { id: orderId, paymentStatus: ORDER_PAYMENT_STATUS.PENDING, refundFailedAt: null },
     data: { paymentStatus: ORDER_PAYMENT_STATUS.FAILED },

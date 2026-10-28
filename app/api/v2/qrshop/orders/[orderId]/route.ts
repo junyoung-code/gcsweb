@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db';
 import { apiErrors, apiSuccess } from '@/lib/api-response';
 import { ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 import { readGuestToken, verifyGuestToken } from '@/lib/qrshop/guest-token';
-import { CANCEL_REASON_STOCK_SHORTAGE, settleStalePendingOrder } from '@/lib/qrshop/payment-confirm';
+import { CANCEL_REASON_STOCK_SHORTAGE, refreshUnconfirmedOrder } from '@/lib/qrshop/payment-confirm';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ function toFailure(order: {
   if (order.refundFailedAt) {
     return {
       failureCode: 'REFUND_PENDING',
-      failureMessage: '품절로 결제가 취소되었습니다. 결제된 금액은 환불 예정입니다.',
+      failureMessage: '해당 상품 품절로 전체 결제 취소 (품절 환불 호출 실패)',
     };
   }
 
@@ -34,7 +34,7 @@ function toFailure(order: {
       return { failureCode: 'PAYMENT_FAILED', failureMessage: '결제가 실패되었습니다.' };
     case ORDER_PAYMENT_STATUS.CANCELED:
       return order.cancelReason === CANCEL_REASON_STOCK_SHORTAGE
-        ? { failureCode: 'STOCK_SHORTAGE', failureMessage: '품절로 결제가 취소되었습니다.' }
+        ? { failureCode: 'STOCK_SHORTAGE', failureMessage: '해당 상품 품절로 전체 결제 취소 (품절 환불 호출 성공)' }
         : { failureCode: 'PAYMENT_CANCELED', failureMessage: '결제가 취소되었습니다.' };
     default:
       return { failureCode: 'PAYMENT_NOT_COMPLETED', failureMessage: '결제가 완료되지 않았습니다.' };
@@ -56,7 +56,7 @@ function findOrder(orderId: string) {
         select: { orderNo: true, store: { select: { name: true, storeSlug: true } } },
       },
       items: {
-        select: { onsiteProductName: true, onsiteOptionName: true, price: true, quantity: true },
+        select: { onsiteProductName: true, onsiteOptionName: true, price: true, quantity: true, stockShortage: true },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       },
     },
@@ -67,9 +67,11 @@ function findOrder(orderId: string) {
  * 방문객 주문 조회. `X-Guest-Token`이 주문의 토큰 해시와 맞을 때만 보여준다.
  * 주문이 없거나, QR샵 주문이 아니거나(OrderNumber 없음), 토큰이 없거나 틀리면 모두 같은 404로 응답한다.
  *
- * 결제 대기가 10분을 넘긴 주문은 먼저 PortOne 으로 실제 결제 여부를 확인해 PAID 또는 FAILED 로 정리한다.
+ * 생성 후 24시간 안의 미확정(PENDING·FAILED) 주문은 먼저 PortOne 으로 실제 결제 여부를 확인해, 결제됐으면 PAID 로 확정한다.
+ * 결제 전이면 상태를 바꾸지 않는다(이탈·늦은 결제 대비로 PENDING 유지).
  * 결제 완료가 아닌 주문도 200으로 내려주고 failureCode/failureMessage 로 사유를 알린다.
  * 주문번호는 PAID 일 때만 내려준다(미결제 주문 번호가 화면에 노출되지 않도록).
+ * `items[].soldOut`은 결제 후 재고 부족으로 취소된 주문(STOCK_SHORTAGE)에서 품절이었던 항목이다. 품절 환불 화면은 이 항목만 보여준다.
  */
 export async function GET(request: Request, { params }: Params) {
   try {
@@ -81,7 +83,7 @@ export async function GET(request: Request, { params }: Params) {
       return apiErrors.notFound(ORDER_NOT_FOUND);
     }
 
-    if (await settleStalePendingOrder(order)) {
+    if (await refreshUnconfirmedOrder(order)) {
       order = (await findOrder(params.orderId)) ?? order;
     }
     if (!order.orderNumber) return apiErrors.notFound(ORDER_NOT_FOUND);
@@ -101,6 +103,7 @@ export async function GET(request: Request, { params }: Params) {
         optionName: item.onsiteOptionName,
         unitPrice: item.price,
         quantity: item.quantity,
+        soldOut: item.stockShortage,
       })),
     });
   } catch (error) {

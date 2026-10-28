@@ -27,10 +27,15 @@ const signed = (body: string, { signWith = RAW_SECRET } = {}) => {
   });
 };
 
+let infoLog: Fn;
+let warnLog: Fn;
+
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('PORTONE_WEBHOOK_SECRET', SECRET);
   confirm.mockResolvedValue({ kind: 'PAID', alreadyPaid: false });
+  infoLog = vi.spyOn(console, 'info').mockImplementation(() => {}) as unknown as Fn;
+  warnLog = vi.spyOn(console, 'warn').mockImplementation(() => {}) as unknown as Fn;
 });
 
 afterEach(() => {
@@ -81,6 +86,33 @@ describe('POST /api/v2/qrshop/payment/webhook', () => {
     expect((await POST(signed(event('Transaction.Paid')))).status).toBe(500);
     confirm.mockRejectedValue(new Error('db down'));
     expect((await POST(signed(event('Transaction.Paid')))).status).toBe(500);
+  });
+
+  describe('수신 로그 (webhook-id 와 결과 한 줄)', () => {
+    const lastLog = (spy: Fn) => JSON.parse(spy.mock.calls.at(-1)![1] as string);
+
+    it('처리 완료: outcome=processed, webhook-id·결제 ID·확정 결과', async () => {
+      await POST(signed(event('Transaction.Paid')));
+      expect(infoLog.mock.calls.at(-1)![0]).toBe('[qrshop/webhook]');
+      expect(lastLog(infoLog)).toEqual({
+        outcome: 'processed',
+        webhookId: 'msg_1',
+        type: 'Transaction.Paid',
+        paymentId: 'ord1',
+        result: 'PAID',
+      });
+    });
+
+    it('대상 아님: outcome=ignored', async () => {
+      await POST(signed(event('Transaction.Ready')));
+      expect(lastLog(infoLog)).toEqual({ outcome: 'ignored', webhookId: 'msg_1', type: 'Transaction.Ready' });
+    });
+
+    it('서명 불일치: warn 으로 outcome=invalid_signature (서명 값은 남기지 않는다)', async () => {
+      await POST(signed(event('Transaction.Paid'), { signWith: crypto.randomBytes(32) }));
+      expect(lastLog(warnLog)).toEqual({ outcome: 'invalid_signature', webhookId: 'msg_1' });
+      expect(JSON.stringify(warnLog.mock.calls)).not.toContain('v1,');
+    });
   });
 
   it('시크릿 환경변수가 없으면 500', async () => {

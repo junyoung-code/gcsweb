@@ -22,6 +22,7 @@ export const storeErrors = {
   notFound: () => apiErrors.notFound('상점을 찾을 수 없음'),
   alreadyExists: () => apiError(409, 'STORE_ALREADY_EXISTS', '이미 등록된 상점이 있음'),
   slugTaken: () => apiError(409, 'STORE_SLUG_TAKEN', '이미 사용 중인 상점 아이디'),
+  hasSales: () => apiError(409, 'STORE_HAS_SALES', '판매 이력이 있는 상점'),
 };
 
 /** Prisma unique 위반(P2002)이 특정 필드에서 났는지 확인한다. */

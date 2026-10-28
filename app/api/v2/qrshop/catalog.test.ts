@@ -65,7 +65,7 @@ describe('GET /api/v2/qrshop', () => {
     expect(await res.json()).toMatchObject({ code: 'NOT_FOUND', message: '존재하지 않는 상점' });
   });
 
-  it('상점·카테고리·상품을 명세 형태로 내려주고 상점 이미지와 재고 수량은 빼고 준다', async () => {
+  it('상점·카테고리·상품을 명세 형태로 내려주고 상점 이미지는 빼고 재고 수량(stock)은 함께 준다', async () => {
     findStore.mockResolvedValue(
       storeRow(
         [
@@ -95,9 +95,10 @@ describe('GET /api/v2/qrshop', () => {
         categoryId: 'c1',
         hasOption: true,
         soldOut: false,
+        stock: null,
         options: [
-          { optionId: 'o1', name: '옵션 o1', surcharge: 1000, soldOut: false },
-          { optionId: 'o2', name: '옵션 o2', surcharge: 0, soldOut: true },
+          { optionId: 'o1', name: '옵션 o1', surcharge: 1000, stock: 2, soldOut: false },
+          { optionId: 'o2', name: '옵션 o2', surcharge: 0, stock: 0, soldOut: true },
         ],
       },
       {
@@ -108,6 +109,7 @@ describe('GET /api/v2/qrshop', () => {
         categoryId: null,
         hasOption: false,
         soldOut: false,
+        stock: 3,
         options: [],
       },
     ]);
@@ -137,7 +139,7 @@ describe('GET /api/v2/qrshop', () => {
     expect((await res.json()).data).toMatchObject({ categories: [], products: [] });
   });
 
-  it('DB 쿼리: 상품 있는 카테고리만, 카테고리 등록순, 상품 최신순, 옵션 이름순', async () => {
+  it('DB 쿼리: 상품 있는 카테고리만, 카테고리 등록순, 상품 최신순, 옵션 등록순(오래된 것이 위)', async () => {
     findStore.mockResolvedValue(storeRow());
     await get('?storeSlug=nirvanaexpress');
 
@@ -146,7 +148,7 @@ describe('GET /api/v2/qrshop', () => {
     expect(select.categories.where).toEqual({ products: { some: {} } });
     expect(select.categories.orderBy).toEqual({ createdAt: 'asc' });
     expect(select.products.orderBy).toEqual([{ createdAt: 'desc' }, { productId: 'desc' }]);
-    expect(select.products.select.options.orderBy).toEqual({ name: 'asc' });
+    expect(select.products.select.options.orderBy).toEqual([{ createdAt: 'asc' }, { optionId: 'asc' }]);
     expect(select.imageUrl).toBeUndefined();
   });
 
