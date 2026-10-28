@@ -189,13 +189,9 @@ model Order {
   bankCode              Int?
   easyPayProvider       Int?
   billingKey            String?
-  orderDateKey          String?
-  orderSeq              Int?
-  orderCode             String?     @unique
   buyerType             BuyerType
   buyerGuestTokenHash   String?     @db.VarChar(128)
-  bagOption             Boolean     @default(false)
-  impUid                String?     @unique
+  impUid               String?     @unique
   canceledAt            DateTime? /// 취소(환불) 시각
   cancelReason          String? /// 취소 사유 (예: STOCK_SHORTAGE)
   refundFailedAt        DateTime? /// 환불 호출 실패 시각. 값이 있으면 수동 환불 필요
@@ -204,33 +200,21 @@ model Order {
   items                 OrderItem[]
   orderNumber           OrderNumber?
 
-  @@unique([orderDateKey, productType, orderSeq])
   @@index([userId])
   @@index([productType, receiveMethod])
   @@index([paymentStatus])
   @@index([receiptStatus])
   @@index([orderDate])
-  @@index([orderDateKey, productType])
   @@index([bankCode])
   @@index([cardCompany])
   @@index([easyPayProvider])
 }
 
-model OrderSequence {
-  orderDateKey String
-  productType  Int
-  lastSeq      Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@id([orderDateKey, productType])
-}
-
-/// QR샵 주문번호. 주문 1건당 1행이며 (상점, 일자(KST)) 안에서 1부터 순번을 매긴다
+/// 주문번호. 주문 1건당 1행이며 (상점, 일자(KST)) 안에서 1부터 순번을 매긴다. /shop 주문은 플레이스홀더 상점(slug goat)의 주문으로 발급한다
 model OrderNumber {
   orderId      String    @id
   orderNo      Int /// 상점·일별 순번 (1부터, 자릿수 고정 없음)
-  type         OrderType /// 주문 유형 (QR샵 현장 판매 주문은 ONSITE)
+  type         OrderType /// 주문 유형 (QR샵 현장 판매 주문은 ONSITE, /shop 주문은 PRE_ORDER)
   storeId      String
   orderTimeKey String /// 주문 일자(KST) YYMMDD
   createdAt    DateTime  @default(now())
@@ -266,19 +250,6 @@ model OrderItem {
 }
 
 // ---------- 상품 (QRshop) ----------
-
-/// QRshop(/Fair) 메뉴별 재고. qrItemId 는 app/QRshop/item.json 의 id 와 동일
-model FairShopProduct {
-  id           String   @id @default(cuid())
-  qrItemId     String   @unique
-  initStock    Int
-  stock        Int /// 판매 가능 재고(결제 확정 시 감소)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  currentStock Int      @default(0) /// 미충족 수요 누적(판매 재고 0일 때 결제 시도마다 요청 수량만큼 감소 → 음수). 분석용
-
-  @@map("FairShopProductTable")
-}
 
 /// QRshop 상점
 model Store {
@@ -557,6 +528,6 @@ enum ReceiptStatus {
 }
 
 enum OrderType {
-  PRE_ORDER /// 사전주문(추후 구현)
+  PRE_ORDER /// /shop 주문(플레이스홀더 상점). 사전주문도 이 값을 쓸 예정
   ONSITE /// 현장판매 (QR샵 주문)
 }
