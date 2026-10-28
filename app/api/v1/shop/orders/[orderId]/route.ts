@@ -84,7 +84,7 @@ export async function GET(request: Request, { params }: Params) {
       },
       select: {
         id: true,
-        orderCode: true,
+        orderNumber: { select: { orderNo: true } },
         userId: true,
         buyerType: true,
         buyerGuestTokenHash: true,
@@ -98,7 +98,6 @@ export async function GET(request: Request, { params }: Params) {
         deliveryMessage: true,
         ordererName: true,
         ordererPhone: true,
-        bagOption: true,
         paymentMethod: true,
         cardCompany: true,
         bankCode: true,
@@ -145,8 +144,7 @@ export async function GET(request: Request, { params }: Params) {
       }
     }
 
-    const { buyerGuestTokenHash: _buyerGuestTokenHash, ...safeOrder } = order;
-    const resolvedOrderCode = order.orderCode ?? order.id.slice(-10).toUpperCase();
+    const { buyerGuestTokenHash: _buyerGuestTokenHash, orderNumber, ...safeOrder } = order;
     const receiptLabel = toOrderReceiptStatusLabel(order.receiptStatus);
 
     const mappedItems = order.items.map((item) => ({
@@ -168,7 +166,7 @@ export async function GET(request: Request, { params }: Params) {
       data: {
         order: {
           ...safeOrder,
-          orderCode: resolvedOrderCode,
+          orderNo: orderNumber?.orderNo ?? null,
           items: mappedItems,
         },
       },
