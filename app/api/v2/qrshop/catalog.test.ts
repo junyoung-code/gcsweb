@@ -137,7 +137,7 @@ describe('GET /api/v2/qrshop', () => {
     expect((await res.json()).data).toMatchObject({ categories: [], products: [] });
   });
 
-  it('DB 쿼리: 상품 있는 카테고리만, 카테고리 등록순, 상품 최신순, 옵션 이름순', async () => {
+  it('DB 쿼리: 상품 있는 카테고리만, 카테고리 등록순, 상품 최신순, 옵션 등록순(오래된 것이 위)', async () => {
     findStore.mockResolvedValue(storeRow());
     await get('?storeSlug=nirvanaexpress');
 
@@ -146,7 +146,7 @@ describe('GET /api/v2/qrshop', () => {
     expect(select.categories.where).toEqual({ products: { some: {} } });
     expect(select.categories.orderBy).toEqual({ createdAt: 'asc' });
     expect(select.products.orderBy).toEqual([{ createdAt: 'desc' }, { productId: 'desc' }]);
-    expect(select.products.select.options.orderBy).toEqual({ name: 'asc' });
+    expect(select.products.select.options.orderBy).toEqual([{ createdAt: 'asc' }, { optionId: 'asc' }]);
     expect(select.imageUrl).toBeUndefined();
   });
 

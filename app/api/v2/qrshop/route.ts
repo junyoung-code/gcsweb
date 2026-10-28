@@ -47,7 +47,7 @@ function toProductResponse(product: ProductRow) {
  * 방문객용 상점 상품 조회. 로그인 없이 `storeSlug`(@ 제외)로 상점을 찾는다.
  *
  * 카테고리는 상품이 1개 이상인 것만 내려준다.
- * 정렬: 카테고리 등록순, 상품 최신 등록순(productId 보조 정렬), 옵션 이름순 — 판매자 상품 API와 같다.
+ * 정렬: 카테고리 등록순, 상품 최신 등록순(productId 보조 정렬), 옵션 등록순(오래된 것이 위, optionId 보조 정렬) — 판매자 상품 API와 같다.
  * 재고 수량은 내려주지 않고 품절 여부만 준다.
  */
 export async function GET(request: Request) {
@@ -78,7 +78,7 @@ export async function GET(request: Request) {
             currentStock: true,
             options: {
               select: { optionId: true, name: true, surcharge: true, currentStock: true },
-              orderBy: { name: 'asc' },
+              orderBy: [{ createdAt: 'asc' }, { optionId: 'asc' }],
             },
           },
           orderBy: [{ createdAt: 'desc' }, { productId: 'desc' }],
