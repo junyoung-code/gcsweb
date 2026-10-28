@@ -4,7 +4,6 @@ import { ORDER_PAYMENT_METHOD } from '@/lib/order-status';
 const ProductTypeSchema = z.union([z.literal(0), z.literal(1)]); // fund | buy now
 const ReceiveMethodSchema = z.union([z.literal(0), z.literal(1)]); // delivery | pickup
 const PaymentMethodSchema = z.union([z.literal(ORDER_PAYMENT_METHOD.ONLINE), z.literal(ORDER_PAYMENT_METHOD.ON_SITE)]); // online | on-site (세부 PG 수단은 PortOne 결제창에서 선택)
-const BagOptionSchema = z.boolean();
 const CardCompanySchema = z.union([
   z.literal(0), z.literal(1), z.literal(2), z.literal(3), z.literal(4),
   z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9),
@@ -35,7 +34,6 @@ export const createOrderSchema = z
     cardCompany: CardCompanySchema.optional().nullable(),
     bankCode: BankCodeSchema.optional().nullable(),
     easyPayProvider: EasyPayProviderSchema.optional().nullable(),
-    bagOption: BagOptionSchema.optional().nullable(),
     isPolicyAgreed: z.boolean().optional(),
     billingKey: z.string().trim().min(1).optional(), // Fund 카드 결제 시 빌링키 (헥토)
     items: z.array(OrderItemSchema).min(1, 'at least one order item is required.'),
@@ -188,13 +186,6 @@ export const createOrderSchema = z
     }
 
     if (isBuyNow) {
-      if (data.bagOption === null || data.bagOption === undefined) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['bagOption'],
-          message: 'BAG_OPTION_REQUIRED',
-        });
-      }
       if (data.cardCompany !== null && data.cardCompany !== undefined) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,

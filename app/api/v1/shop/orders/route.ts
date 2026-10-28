@@ -7,12 +7,8 @@ import { prisma } from '@/lib/db';
 import { createOrderSchema } from '@/lib/validations/order';
 import { getSaleStatusByDate } from '@/lib/sale-date';
 import { isMatchedVariantSoldOut } from '@/lib/variant-signature';
-import {
-  ORDER_CODE_CONFIG,
-  buildOrderCode,
-  getOrderDateKeyYYMMDD,
-  mapProductTypeToOrderCode,
-} from '@/lib/order-code';
+import { issueOrderNumber } from '@/lib/qrshop/order-number';
+import { getShopStoreId } from '@/lib/shop-store';
 import { apiError as jsonError } from '@/lib/api-response';
 import { ORDER_PAYMENT_METHOD, ORDER_PAYMENT_STATUS } from '@/lib/order-status';
 
@@ -31,13 +27,11 @@ function mapValidationIssueToErrorCode(issue: { path?: (string | number)[]; mess
   if (issue.message === 'INVALID_BANK_CODE') return 'INVALID_BANK_CODE';
   if (issue.message === 'INVALID_EASY_PAY_PROVIDER') return 'INVALID_EASY_PAY_PROVIDER';
   if (issue.message === 'POLICY_AGREEMENT_REQUIRED') return 'POLICY_AGREEMENT_REQUIRED';
-  if (issue.message === 'BAG_OPTION_REQUIRED') return 'BAG_OPTION_REQUIRED';
 
   if (path === 'cardCompany') return 'INVALID_CARD_COMPANY';
   if (path === 'bankCode') return 'INVALID_BANK_CODE';
   if (path === 'easyPayProvider') return 'INVALID_EASY_PAY_PROVIDER';
   if (path === 'isPolicyAgreed') return 'POLICY_AGREEMENT_REQUIRED';
-  if (path === 'bagOption') return 'BAG_OPTION_REQUIRED';
 
   return 'INVALID_INPUT';
 }
@@ -67,7 +61,6 @@ function hashGuestToken(token: string): string {
 
 const ORDER_CREATE_MAX_RETRIES = 3;
 const ORDER_CREATE_RETRY_BASE_DELAY_MS = 30;
-const BUY_NOW_BAG_FEE = 100;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -123,7 +116,6 @@ export async function GET(request: Request) {
           deliveryMessage: true,
           ordererName: true,
           ordererPhone: true,
-          bagOption: true,
           paymentMethod: true,
           cardCompany: true,
           bankCode: true,
@@ -272,7 +264,6 @@ export async function POST(request: Request) {
     if ((isBuyNow || isFundPickup) && data.isPolicyAgreed !== true) {
       return jsonError(400, 'POLICY_AGREEMENT_REQUIRED', 'policy agreement is required.');
     }
-    const bagOption = isBuyNow ? data.bagOption === true : false;
 
     let paymentAmount = 0;
     const itemRows = data.items.map((item) => {
@@ -292,9 +283,6 @@ export async function POST(request: Request) {
         optionData: toDbJson(item.optionData),
       };
     });
-    if (isBuyNow && bagOption) {
-      paymentAmount += BUY_NOW_BAG_FEE;
-    }
 
     const ordererName = isBuyNow ? null : data.ordererName?.trim() || user?.name || '';
     const ordererPhone = isBuyNow ? null : data.ordererPhone?.trim() || user?.phone || '';
@@ -302,50 +290,14 @@ export async function POST(request: Request) {
       return jsonError(400, 'INVALID_INPUT', 'ordererName and ordererPhone are required.');
     }
 
-    const orderDateKey = getOrderDateKeyYYMMDD(new Date());
+    const shopStoreId = await getShopStoreId(prisma);
     const createOrderTransaction = () =>
       prisma.$transaction(async (tx) => {
-        const sequence = await tx.orderSequence.upsert({
-          where: {
-            orderDateKey_productType: {
-              orderDateKey,
-              productType: data.productType,
-            },
-          },
-          create: {
-            orderDateKey,
-            productType: data.productType,
-            lastSeq: 1,
-          },
-          update: {
-            lastSeq: {
-              increment: 1,
-            },
-          },
-          select: {
-            lastSeq: true,
-          },
-        });
-
-        const orderSeq = sequence.lastSeq;
-        if (orderSeq > ORDER_CODE_CONFIG.sequenceMax) {
-          throw new Error('ORDER_SEQUENCE_EXCEEDED');
-        }
-        const productTypeCode = mapProductTypeToOrderCode(data.productType);
-        const orderCode = buildOrderCode({
-          orderDateKey,
-          productTypeCode,
-          orderSeq,
-        });
-
         const order = await tx.order.create({
           data: {
             userId: buyerUserId,
             buyerType,
             buyerGuestTokenHash,
-            orderDateKey,
-            orderSeq,
-            orderCode,
             productType: data.productType,
             receiveMethod: data.receiveMethod,
             receiverName: isFund ? data.receiverName ?? null : null,
@@ -356,7 +308,6 @@ export async function POST(request: Request) {
             deliveryMessage: isFundDelivery ? data.deliveryMessage ?? null : null,
             ordererName,
             ordererPhone,
-            bagOption,
             paymentMethod: data.paymentMethod,
             billingKey: isFundCard ? normalizedBillingKey : null,
             // 세부 결제수단은 온라인 fund에서만 받는다. 현장결제·buynow는 모두 null.
@@ -369,9 +320,6 @@ export async function POST(request: Request) {
           },
           select: {
             id: true,
-            orderDateKey: true,
-            orderSeq: true,
-            orderCode: true,
             productType: true,
             receiveMethod: true,
             receiverName: true,
@@ -382,7 +330,6 @@ export async function POST(request: Request) {
             deliveryMessage: true,
             ordererName: true,
             ordererPhone: true,
-            bagOption: true,
             paymentMethod: true,
             billingKey: true,
             cardCompany: true,
@@ -415,7 +362,10 @@ export async function POST(request: Request) {
           )
         );
 
-        return { order, items: createdItems };
+        // 주문번호는 주문 생성과 같은 트랜잭션에서 발급한다 (플레이스홀더 상점의 일별 순번)
+        const { orderNo } = await issueOrderNumber(tx, { orderId: order.id, storeId: shopStoreId, type: 'PRE_ORDER' });
+
+        return { order: { ...order, orderNo }, items: createdItems };
       });
     let created: Awaited<ReturnType<typeof createOrderTransaction>> | null = null;
     for (let attempt = 1; attempt <= ORDER_CREATE_MAX_RETRIES; attempt += 1) {
@@ -453,9 +403,6 @@ export async function POST(request: Request) {
     }
     if (error instanceof Error && error.message === 'VARIANT_SOLD_OUT') {
       return jsonError(409, 'INVALID_STATE', 'sold-out variants cannot be ordered.');
-    }
-    if (error instanceof Error && error.message === 'ORDER_SEQUENCE_EXCEEDED') {
-      return jsonError(409, 'ORDER_SEQUENCE_EXCEEDED', 'daily order sequence limit exceeded.');
     }
     if (error instanceof Error && error.message === 'ORDER_CREATE_RETRY_EXCEEDED') {
       return jsonError(409, 'ORDER_CREATE_RETRY_EXCEEDED', 'please retry order creation.');

@@ -59,8 +59,9 @@ export function toStoreSummary(store: StoreRow) {
   };
 }
 
-export function toStoreDetail(store: StoreRow & { createdAt: Date }) {
-  return { ...toStoreSummary(store), createdAt: store.createdAt.toISOString() };
+/** hasSalesHistory: 결제완료 주문이 1건이라도 있으면 true (상점 삭제하기 버튼 노출 판단용). */
+export function toStoreDetail(store: StoreRow & { createdAt: Date }, hasSalesHistory: boolean) {
+  return { ...toStoreSummary(store), createdAt: store.createdAt.toISOString(), hasSalesHistory };
 }
 
 export function generateStoreQrSvg(storeUrl: string): Promise<string> {

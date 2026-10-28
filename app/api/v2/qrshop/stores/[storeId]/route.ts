@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db';
 import { apiErrors, apiSuccess } from '@/lib/api-response';
+import { hasStorePaidSale } from '@/lib/qrshop/sales-history';
 import { INVALID_STORE_REQUEST, toStoreDetail, toStoreSummary, updateStoreSchema } from '@/lib/qrshop/store';
 import { deleteStoreWithoutSales } from '@/lib/qrshop/store-delete';
 import { isUniqueViolation, requireStoreUser, storeErrors } from '@/lib/qrshop/store-api';
@@ -18,7 +19,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     });
     if (!store) return storeErrors.notFound();
 
-    return apiSuccess(toStoreDetail(store));
+    return apiSuccess(toStoreDetail(store, await hasStorePaidSale(store.storeId)));
   } catch (error) {
     console.error('[v2/qrshop/stores/:storeId] GET error:', error);
     return apiErrors.serverError();

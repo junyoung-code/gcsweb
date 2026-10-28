@@ -8,6 +8,7 @@ import { GET as getMe } from './me/route';
 import { POST } from './route';
 import { DELETE, GET as getStore, PATCH } from './[storeId]/route';
 import { deleteStoreWithoutSales } from '@/lib/qrshop/store-delete';
+import { hasStorePaidSale } from '@/lib/qrshop/sales-history';
 import { GET as getQrCode } from './[storeId]/qrcode/route';
 
 vi.mock('@/lib/db', () => ({
@@ -17,10 +18,12 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 vi.mock('@/lib/qrshop/store-delete', () => ({ deleteStoreWithoutSales: vi.fn() }));
+vi.mock('@/lib/qrshop/sales-history', () => ({ hasStorePaidSale: vi.fn() }));
 vi.mock('next-auth', () => ({ getServerSession: vi.fn() }));
 vi.mock('@/lib/auth', () => ({ authOptions: {} }));
 
 const store = prisma.store as unknown as Record<'findUnique' | 'findFirst' | 'create' | 'update', ReturnType<typeof vi.fn>>;
+const paidSale = hasStorePaidSale as unknown as ReturnType<typeof vi.fn>;
 const session = getServerSession as unknown as ReturnType<typeof vi.fn>;
 
 const json = (body: unknown) =>
@@ -101,10 +104,17 @@ describe('GET /api/v2/qrshop/stores/me', () => {
     expect(await (await getMe()).json()).toEqual({ status: 'success', data: null });
   });
 
-  it('상점이 있으면 createdAt 포함 상세', async () => {
+  it('상점이 있으면 createdAt과 hasSalesHistory 포함 상세', async () => {
     store.findUnique.mockResolvedValue({ storeId: 's1', name: '가게', storeSlug: 'abcd', createdAt: new Date('2026-10-02T00:00:00.000Z') });
+    paidSale.mockResolvedValue(true);
     const body = await (await getMe()).json();
-    expect(body.data).toMatchObject({ storeId: 's1', storeUrl: 'https://example.com/QRshop/@abcd', createdAt: '2026-10-02T00:00:00.000Z' });
+    expect(body.data).toMatchObject({
+      storeId: 's1',
+      storeUrl: 'https://example.com/QRshop/@abcd',
+      createdAt: '2026-10-02T00:00:00.000Z',
+      hasSalesHistory: true,
+    });
+    expect(paidSale.mock.calls[0][0]).toBe('s1');
   });
 });
 
@@ -115,6 +125,13 @@ describe('GET /api/v2/qrshop/stores/{storeId}', () => {
     expect(res.status).toBe(404);
     expect((await res.json()).code).toBe('NOT_FOUND');
     expect(store.findFirst.mock.calls[0][0].where).toEqual({ storeId: 's1', userId: 'u1' });
+  });
+
+  it('본인 상점이면 판매이력 여부(hasSalesHistory)를 함께 돌려준다', async () => {
+    store.findFirst.mockResolvedValue({ storeId: 's1', name: '가게', storeSlug: 'abcd', createdAt: new Date('2026-10-02T00:00:00.000Z') });
+    paidSale.mockResolvedValue(false);
+    const body = await (await getStore(new Request('http://localhost/x'), ctx())).json();
+    expect(body.data).toMatchObject({ storeId: 's1', hasSalesHistory: false });
   });
 });
 

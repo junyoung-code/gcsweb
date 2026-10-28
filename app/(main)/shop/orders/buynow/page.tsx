@@ -4,7 +4,6 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { NavBar } from '@/components/layout';
 import Button from '@/components/ui/button/Button';
-import CheckboxButton from '@/components/ui/button/CheckboxButton';
 import { formatPrice } from '@/lib/utils';
 import { ORDER_PAYMENT_METHOD } from '@/lib/order-status';
 
@@ -163,7 +162,6 @@ function ShopOrdersBuyNowPageContent() {
   const [items, setItems] = useState<OrderLineItem[]>([]);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<typeof ORDER_PAYMENT_METHOD[keyof typeof ORDER_PAYMENT_METHOD]>(ORDER_PAYMENT_METHOD.ONLINE);
-  const [bagOption, setBagOption] = useState<boolean | null>(null);
   const [showSoldOutModal, setShowSoldOutModal] = useState(false);
 
   const selectedCartItemIds = useMemo(() => {
@@ -272,12 +270,11 @@ function ShopOrdersBuyNowPageContent() {
   }, [selectedCartItemIds]);
 
   const totalPriceText = useMemo(() => {
-    const baseTotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-    const total = baseTotal + (bagOption === true ? 100 : 0);
+    const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
     return formatPrice(total);
-  }, [bagOption, items]);
+  }, [items]);
 
-  const isPayEnabled = items.length > 0 && bagOption !== null;
+  const isPayEnabled = items.length > 0;
 
   const handleSubmit = async () => {
     if (!isPayEnabled || isSubmitting) return;
@@ -318,7 +315,6 @@ function ShopOrdersBuyNowPageContent() {
         cardCompany: null,
         bankCode: null,
         easyPayProvider: null,
-        bagOption,
         isPolicyAgreed: true,
         items: items.map((item) => ({
           productId: item.productId,
@@ -434,27 +430,6 @@ function ShopOrdersBuyNowPageContent() {
             >
               현장결제
             </Button>
-          </div>
-        </section>
-
-        <section className="rounded-2xl bg-neutral-2 p-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-1 typo-body-xsmall">
-              <span className="text-red-600">(필수)</span>
-              <span className="text-black">봉투에 담아드릴까요?</span>
-            </div>
-            <div className="flex gap-3">
-              <CheckboxButton
-                checked={bagOption === true}
-                onChange={(checked) => setBagOption(checked ? true : null)}
-                label="예(+100원)"
-              />
-              <CheckboxButton
-                checked={bagOption === false}
-                onChange={(checked) => setBagOption(checked ? false : null)}
-                label="아니요"
-              />
-            </div>
           </div>
         </section>
 

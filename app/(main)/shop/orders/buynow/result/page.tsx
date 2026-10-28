@@ -16,7 +16,7 @@ type OrderResultItem = {
 };
 
 type OrderResultData = {
-  orderCode: string;
+  orderNo: number | null;
   items: OrderResultItem[];
 };
 
@@ -104,16 +104,16 @@ function ResultContent() {
       if (cancelled) return;
 
       if (!res.ok || json?.status !== 'success') {
-        setOrderResult({ orderCode: '', items: [] });
+        setOrderResult({ orderNo: null, items: [] });
         return;
       }
 
       const order = json?.data?.order ?? {};
-      const orderCode = typeof order?.orderCode === 'string' ? order.orderCode : '';
+      const orderNo = typeof order?.orderNo === 'number' ? order.orderNo : null;
       const items = Array.isArray(order?.items) ? order.items : [];
 
       setOrderResult({
-        orderCode,
+        orderNo,
         items: items.map((item: any) => ({
           id: String(item?.id ?? ''),
           productName: String(item?.productName ?? '상품'),
@@ -140,7 +140,8 @@ function ResultContent() {
   }
 
   if (status === 'success') {
-    const orderCodeText = orderResult?.orderCode ? `주문번호 ${orderResult.orderCode}` : '주문번호 확인 중';
+    const orderNoText =
+      orderResult?.orderNo != null ? `주문번호 ${String(orderResult.orderNo).padStart(3, '0')}` : '주문번호 확인 중';
     const items = orderResult?.items ?? [];
 
     return (
@@ -149,7 +150,7 @@ function ResultContent() {
 
         <div className="mx-auto flex w-full max-w-[375px] flex-col gap-5 px-4 py-5">
           <section className="flex w-full flex-col items-center justify-center p-3 text-center">
-            <p className="text-[19px] font-bold leading-[1.5] text-orange-5">{orderCodeText}</p>
+            <p className="text-[19px] font-bold leading-[1.5] text-orange-5">{orderNoText}</p>
             <p className="typo-body-small text-neutral-8">주문번호 확인을 위해 스크린샷을 남겨주세요!</p>
           </section>
 
