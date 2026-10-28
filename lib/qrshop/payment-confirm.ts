@@ -54,6 +54,7 @@ export type ConfirmDeps = {
 };
 
 type StockItem = {
+  id: string;
   quantity: number;
   onsiteProductId: string | null;
   onsiteOptionId: string | null;
@@ -61,8 +62,11 @@ type StockItem = {
   onsiteOptionName: string | null;
 };
 
+/** 재고가 모자란 주문 항목: 응답용 정보(`soldOut`)와 품절 표시를 남길 OrderItem id. */
+type Shortage = { orderItemId: string; soldOut: SoldOutItem };
+
 class StockShortageError extends Error {
-  constructor(readonly soldOutItems: SoldOutItem[]) {
+  constructor(readonly shortages: Shortage[]) {
     super(CANCEL_REASON_STOCK_SHORTAGE);
   }
 }
@@ -71,16 +75,19 @@ class StockShortageError extends Error {
  * 항목별로 재고를 조건부 차감한다(`현재 재고 >= 수량`). 옵션 상품은 옵션과 상품 재고(= 옵션 합계)를 함께 줄인다.
  * 상품·옵션이 삭제돼 FK 가 비어 있는 항목은 품절로 본다. 모자란 항목을 모아서 돌려준다(호출 쪽이 롤백한다).
  */
-async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]): Promise<SoldOutItem[]> {
-  const soldOut: SoldOutItem[] = [];
+async function decrementStock(tx: Prisma.TransactionClient, items: StockItem[]): Promise<Shortage[]> {
+  const soldOut: Shortage[] = [];
 
   for (const item of items) {
-    const shortage = (availableQuantity: number): SoldOutItem => ({
-      productId: item.onsiteProductId,
-      optionId: item.onsiteOptionId,
-      name: item.onsiteProductName ?? '',
-      optionName: item.onsiteOptionName,
-      availableQuantity: Math.max(availableQuantity, 0),
+    const shortage = (availableQuantity: number): Shortage => ({
+      orderItemId: item.id,
+      soldOut: {
+        productId: item.onsiteProductId,
+        optionId: item.onsiteOptionId,
+        name: item.onsiteProductName ?? '',
+        optionName: item.onsiteOptionName,
+        availableQuantity: Math.max(availableQuantity, 0),
+      },
     });
 
     const deletedOption = item.onsiteOptionName !== null && item.onsiteOptionId === null;
@@ -141,6 +148,7 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
       orderNumber: { select: { type: true } },
       items: {
         select: {
+          id: true,
           quantity: true,
           onsiteProductId: true,
           onsiteOptionId: true,
@@ -207,16 +215,26 @@ export async function confirmOrderPayment(orderId: string, overrides: Partial<Co
     return result;
   } catch (error) {
     if (!(error instanceof StockShortageError)) throw error;
-    return refundForStockShortage(deps, order.id, error.soldOutItems);
+    return refundForStockShortage(deps, order.id, error.shortages);
   }
 }
 
-/** 재고 부족으로 확정하지 못한 결제를 전액 환불하고 주문을 취소 처리한다. */
+/**
+ * 재고 부족으로 확정하지 못한 결제를 전액 환불하고 주문을 취소 처리한다.
+ * 품절 항목은 OrderItem.stockShortage 로 남긴다 — 결제 후 품절 환불 화면은 품절 상품만 보여줘야 해서
+ * 주문 조회(재진입·웹훅이 먼저 처리한 경우 포함)에서도 어느 항목이 품절이었는지 알 수 있어야 한다.
+ */
 async function refundForStockShortage(
   deps: ConfirmDeps,
   orderId: string,
-  soldOutItems: SoldOutItem[],
+  shortages: Shortage[],
 ): Promise<ConfirmResult> {
+  const soldOutItems = shortages.map((shortage) => shortage.soldOut);
+  await deps.db.orderItem.updateMany({
+    where: { orderId, id: { in: shortages.map((shortage) => shortage.orderItemId) } },
+    data: { stockShortage: true },
+  });
+
   const refund = await deps.cancelPayment({ paymentId: orderId, reason: REFUND_REASON_STOCK_SHORTAGE });
   const now = deps.now();
 

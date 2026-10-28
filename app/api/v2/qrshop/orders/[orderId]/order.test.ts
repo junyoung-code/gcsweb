@@ -28,7 +28,7 @@ const orderRow = (overrides: Record<string, unknown> = {}) => ({
   refundFailedAt: null,
   createdAt: new Date('2026-04-03T02:15:00.000Z'),
   orderNumber: { orderNo: 147, store: { name: '열반급행', storeSlug: 'nirvanaexpress' } },
-  items: [{ onsiteProductName: '키캡키링 A', onsiteOptionName: '4일차', price: 5000, quantity: 3 }],
+  items: [{ onsiteProductName: '키캡키링 A', onsiteOptionName: '4일차', price: 5000, quantity: 3, stockShortage: false }],
   ...overrides,
 });
 
@@ -59,7 +59,7 @@ describe('GET /api/v2/qrshop/orders/:orderId', () => {
       orderedAt: '2026-04-03T02:15:00.000Z',
       paymentAmount: 15000,
       store: { name: '열반급행', storeSlug: 'nirvanaexpress' },
-      items: [{ name: '키캡키링 A', optionName: '4일차', unitPrice: 5000, quantity: 3 }],
+      items: [{ name: '키캡키링 A', optionName: '4일차', unitPrice: 5000, quantity: 3, soldOut: false }],
     });
   });
 
@@ -95,6 +95,25 @@ describe('GET /api/v2/qrshop/orders/:orderId', () => {
       failureCode: code,
       failureMessage: message,
     });
+  });
+
+  it('결제 후 품절 취소 주문은 항목별 soldOut 을 내려줘 품절 상품만 구분할 수 있다', async () => {
+    findOrder.mockResolvedValue(
+      orderRow({
+        paymentStatus: 'CANCELED',
+        cancelReason: 'STOCK_SHORTAGE',
+        items: [
+          { onsiteProductName: '키캡키링 A', onsiteOptionName: '4일차', price: 5000, quantity: 3, stockShortage: true },
+          { onsiteProductName: '엽서 A', onsiteOptionName: null, price: 1000, quantity: 1, stockShortage: false },
+        ],
+      }),
+    );
+    const { data } = await (await get()).json();
+    expect(data.failureCode).toBe('STOCK_SHORTAGE');
+    expect(data.items.map((item: { name: string; soldOut: boolean }) => [item.name, item.soldOut])).toEqual([
+      ['키캡키링 A', true],
+      ['엽서 A', false],
+    ]);
   });
 
   it('미확정 주문은 PortOne 확인(늦은 결제 확정) 후 다시 읽은 상태로 응답한다', async () => {

@@ -10,6 +10,7 @@ import {
 } from './payment-confirm';
 
 type Item = {
+  id: string;
   quantity: number;
   onsiteProductId: string | null;
   onsiteOptionId: string | null;
@@ -18,6 +19,7 @@ type Item = {
 };
 
 const optionItem: Item = {
+  id: 'oi1',
   quantity: 2,
   onsiteProductId: 'p1',
   onsiteOptionId: 'o1',
@@ -25,6 +27,7 @@ const optionItem: Item = {
   onsiteOptionName: '4일차',
 };
 const plainItem: Item = {
+  id: 'oi2',
   quantity: 1,
   onsiteProductId: 'p2',
   onsiteOptionId: null,
@@ -64,6 +67,7 @@ function setup(order: unknown, opts: { currentStatus?: string; optionCount?: num
   };
   const db = {
     order: { findUnique: vi.fn().mockResolvedValue(order), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    orderItem: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
     $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
   };
   const getPayment = vi.fn().mockResolvedValue({ success: true, status: 'PAID', amount: { total: 12000 }, impUid: 'imp_1' });
@@ -202,6 +206,11 @@ describe('confirmOrderPayment', () => {
       soldOutItems: [{ productId: 'p1', optionId: 'o1', name: '키캡키링 A', optionName: '4일차', availableQuantity: 1 }],
     });
     expect(t.tx.order.update).not.toHaveBeenCalled();
+    // 품절이었던 항목(옵션 항목)만 표시하고 재고가 충분했던 항목은 건드리지 않는다.
+    expect(t.db.orderItem.updateMany).toHaveBeenCalledWith({
+      where: { orderId: 'ord1', id: { in: ['oi1'] } },
+      data: { stockShortage: true },
+    });
     expect(t.cancelPayment).toHaveBeenCalledWith(expect.objectContaining({ paymentId: 'ord1' }));
     expect(t.db.order.updateMany).toHaveBeenCalledWith({
       where: { id: 'ord1', paymentStatus: { in: ['PENDING', 'FAILED'] } },
@@ -244,6 +253,10 @@ describe('confirmOrderPayment', () => {
     spy.mockRestore();
 
     expect(result).toMatchObject({ kind: 'STOCK_SHORTAGE', refunded: false });
+    expect(t.db.orderItem.updateMany).toHaveBeenCalledWith({
+      where: { orderId: 'ord1', id: { in: ['oi1'] } },
+      data: { stockShortage: true },
+    });
     expect(t.db.order.updateMany).toHaveBeenCalledWith({
       where: { id: 'ord1', paymentStatus: { in: ['PENDING', 'FAILED'] } },
       data: { refundFailedAt: NOW, cancelReason: CANCEL_REASON_STOCK_SHORTAGE },

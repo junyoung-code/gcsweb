@@ -56,7 +56,7 @@ function findOrder(orderId: string) {
         select: { orderNo: true, store: { select: { name: true, storeSlug: true } } },
       },
       items: {
-        select: { onsiteProductName: true, onsiteOptionName: true, price: true, quantity: true },
+        select: { onsiteProductName: true, onsiteOptionName: true, price: true, quantity: true, stockShortage: true },
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
       },
     },
@@ -71,6 +71,7 @@ function findOrder(orderId: string) {
  * 결제 전이면 상태를 바꾸지 않는다(이탈·늦은 결제 대비로 PENDING 유지).
  * 결제 완료가 아닌 주문도 200으로 내려주고 failureCode/failureMessage 로 사유를 알린다.
  * 주문번호는 PAID 일 때만 내려준다(미결제 주문 번호가 화면에 노출되지 않도록).
+ * `items[].soldOut`은 결제 후 재고 부족으로 취소된 주문(STOCK_SHORTAGE)에서 품절이었던 항목이다. 품절 환불 화면은 이 항목만 보여준다.
  */
 export async function GET(request: Request, { params }: Params) {
   try {
@@ -102,6 +103,7 @@ export async function GET(request: Request, { params }: Params) {
         optionName: item.onsiteOptionName,
         unitPrice: item.price,
         quantity: item.quantity,
+        soldOut: item.stockShortage,
       })),
     });
   } catch (error) {
