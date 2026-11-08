@@ -1,0 +1,155 @@
+.page { min-height: 100dvh; background: var(--color-neutral-4); color: var(--color-neutral-9); }
+.page button:focus-visible, .page a:focus-visible, .dialog button:focus-visible, .dialog a:focus-visible, .dialog input:focus-visible {
+  outline: 2px solid var(--color-orange-6); outline-offset: 3px;
+}
+.header { height: 58px; padding-top: 15px; display: flex; justify-content: center; overflow: hidden; background: var(--color-neutral-3); box-shadow: 0 1px 2px #6351491a; }
+.header img { flex: none; max-width: none; width: 1392px; height: 25px; }
+.main { width: min(1058px, calc(100% - 48px)); margin: 0 auto; padding: 53px 0; display: flex; flex-direction: column; gap: 24px; }
+.overview, .products, .emptyProducts { width: min(1057px, 100%); background: var(--color-neutral-1); border-radius: 16px; }
+.overview { padding: 32px; display: flex; flex-direction: column; gap: 25px; }
+.profile { display: flex; align-items: center; gap: 34px; min-height: 161px; }
+.photo { display: flex; align-items: center; justify-content: center; width: 161px; height: 161px; flex: none; border-radius: 10px; border: 1px solid var(--color-neutral-2); overflow: hidden; background: var(--color-orange-2); }
+.profileCart { width: 80px; height: 80px; background: var(--color-orange-4); mask: url('/assets/icons/light/cart.svg') center / contain no-repeat; -webkit-mask: url('/assets/icons/light/cart.svg') center / contain no-repeat; }
+.profileInfo { min-width: 0; display: flex; flex-direction: column; gap: 25px; }
+.profileInfo h2 { font-size: 34px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+.profileInfo p { font-size: 24px; line-height: 1.5; color: var(--color-neutral-8); margin-top: 7px; overflow-wrap: anywhere; }
+.profileActions { display: flex; gap: 10px; }
+.profileActions button, .profileActions .editStore { height: 42px; border-color: var(--color-neutral-5); color: var(--color-neutral-8); font-size: 17px; white-space: nowrap; }
+.editStore { width: 120px; }
+.qrButton { width: 145px; }
+.noStore { display: flex; flex-direction: column; gap: 17px; align-items: flex-start; }
+.noStore .registerLink { min-width: 200px; }
+.noStore h2 { @apply text-[32px] font-extrabold leading-[150%] tracking-[0]; }
+.registerLink { display: inline-flex; align-items: center; justify-content: center; min-height: 47px; padding: 7px 16px; border-radius: 8px; color: var(--color-neutral-2); background: var(--color-orange-5); font-size: 22px; font-weight: 700; line-height: 1.5; }
+.registerLink:hover { background: var(--color-orange-6); }
+.divider { height: 1px; margin: -.5px 0; overflow: hidden; }
+.divider img { max-width: none; width: 994px; height: 1px; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.stats > div { padding: 14px 21px; border-radius: 14px; background: var(--color-neutral-4); }
+.stats dt { font-size: 20px; line-height: 1.5; color: var(--color-neutral-8); }
+.stats dd { font-size: 34px; font-weight: 700; line-height: 1.5; margin-top: 1px; overflow-wrap: anywhere; }
+.products { padding: 26px 12px 26px 32px; overflow: hidden; }
+.sectionHeading { @apply text-[24px] font-bold leading-[150%] tracking-[0]; display: flex; align-items: center; gap: 4px; }
+.recentLabel { @apply text-[17px] font-normal leading-[150%] tracking-[0]; margin-top: 16px; margin-bottom: 14px; color: var(--color-neutral-8); }
+/* Keep the next-arrow slot at the end so hiding it cannot resize the viewport. */
+.carousel { display: flex; align-items: center; gap: 12px; }
+.scrolledCarousel { margin-left: -20px; }
+.carouselButtonSlot { width: 24px; height: 40px; flex: none; }
+.productList { display: flex; flex: 1; gap: 24px; min-width: 0; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.productList::-webkit-scrollbar { display: none; }
+.productCard { display: flex; align-items: center; gap: 17px; width: 353px; flex: none; padding: 16px; border: 1px solid var(--color-neutral-5); border-radius: 14px; }
+.productImage { width: 140px; height: 140px; flex: none; border-radius: 6.813px; object-fit: cover; }
+.productPlaceholder { background: var(--color-orange-2); }
+.productInfo { width: 162px; flex: none; display: flex; flex-direction: column; gap: 19px; }
+.productName { display: flex; gap: 5px; align-items: center; }
+.productName > span { @apply text-[11px] font-normal leading-[150%] tracking-[0]; flex: none; max-width: 56px; padding: 1px 6px; border-radius: 4px; background: var(--color-orange-3); color: var(--color-neutral-10); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.productName h3 { @apply text-[17px] font-bold leading-[150%] tracking-[0]; color: var(--color-neutral-12); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.price { @apply text-[17px] font-bold leading-[150%] tracking-[0]; color: var(--color-neutral-12); margin-top: 5px; }
+.stock { @apply text-[13px] font-normal leading-[150%] tracking-[-0.02em]; color: var(--color-neutral-8); margin-top: 5px; }
+.productActions { display: flex; gap: 10px; }
+.productActions button, .productActions a { display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-neutral-6); font-weight: 700; width: 76px; height: 39px; border-radius: 6px; padding: 8px; background: var(--color-neutral-1); color: var(--color-neutral-7); }
+.carouselButton { width: 24px; height: 40px; flex: none; }
+.carouselButton:disabled { opacity: .25; cursor: default; }
+.previousButton img { transform: rotate(180deg); }
+.emptyProducts { min-height: 318px; padding: 50px 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; text-align: center; }
+.emptyProducts h2 { font-size: 34px; font-weight: 700; line-height: 1.5; }
+.emptyProducts p { font-size: 24px; line-height: 1.5; color: var(--color-neutral-8); }
+.storeOnly { min-height: 315px; gap: 20px; }
+.storeOnly h2 { font-size: 32px; font-weight: 800; }
+.storeOnly .registerLink { width: 220px; min-height: 55px; font-size: 24px; padding: 9px 16px; }
+.shortcuts { width: min(1057px, 100%); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 17px; }
+.shortcuts button, .shortcuts > a { padding: 19px 26px; background: var(--color-neutral-1); border-radius: 14px; text-align: left; }
+.shortcuts span { @apply text-[24px] font-bold leading-[150%] tracking-[0]; display: flex; align-items: center; gap: 8px; }
+.shortcuts p { margin-top: 5px; font-size: 20px; line-height: 1.5; color: var(--color-neutral-8); }
+.toast { position: fixed; z-index: 40; top: 86px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 32px); min-height: 50px; width: max-content; padding: 9px 16px; border: 1px solid var(--color-orange-4); border-radius: 8px; background: white; color: var(--color-orange-4); }
+.toast img { flex: none; }
+.toast p { @apply text-[19px] font-bold leading-[155%] tracking-[0]; }
+.skeleton { display: grid; gap: 24px; width: 100%; }
+.skeleton > div { height: 385px; border-radius: 16px; background: var(--color-neutral-1); animation: pulse 1.5s ease-in-out infinite; }
+.skeleton > div:nth-child(2) { height: 318px; }
+.skeleton > div:nth-child(3) { height: 109px; }
+.error { min-height: 385px; padding: 32px; border-radius: 16px; background: white; display: flex; flex-direction: column; gap: 18px; align-items: center; justify-content: center; text-align: center; }
+.error h2 { @apply text-[24px] font-bold leading-[150%] tracking-[0]; }
+.dialog { position: fixed; margin: auto; max-width: calc(100% - 32px); max-height: calc(100dvh - 32px); border: 0; padding: 0; overflow-y: auto; color: var(--color-neutral-12); background: white; }
+.dialog::backdrop { background: rgb(0 0 0 / .5); }
+.qrDialog { width: 597px; border-radius: 20px; padding: 27px 36px 40px; }
+.qrHeader { display: flex; align-items: center; justify-content: space-between; padding-bottom: 22px; border-bottom: 1px solid var(--color-neutral-4); }
+.qrHeader h2 { @apply text-[24px] font-bold leading-[150%] tracking-[0]; }
+.qrHeader button { flex: none; }
+.qrImage { margin: 40px auto; width: 307px; max-width: 100%; aspect-ratio: 1; border: 2px solid var(--color-neutral-4); border-radius: 8px; overflow: hidden; }
+.qrImage img { width: 100%; height: 100%; object-fit: contain; }
+.qrDetails label { @apply text-[19px] font-bold leading-[150%] tracking-[0]; display: block; margin-bottom: 10px; color: var(--color-neutral-9); }
+.qrUrl { display: flex; align-items: center; gap: 9px; padding: 9px 18px; border: 2px solid var(--color-orange-4); border-radius: 8px; }
+.qrUrl input { min-width: 0; width: 100%; color: var(--color-neutral-12); font-size: 20px; line-height: 1.5; background: white; }
+.qrUrl button { width: 30px; height: 30px; display: grid; place-items: center; flex: none; }
+.qrHelp { @apply text-[15px] font-normal leading-[150%] tracking-[0]; margin-top: 11px; color: var(--color-neutral-8); }
+.qrActions { display: flex; gap: 13px; margin-top: 30px; }
+.qrActions > * { @apply text-[19px] font-bold leading-[155%] tracking-[0]; display: flex; align-items: center; justify-content: center; width: 50%; height: 56px; border-radius: 8px; color: var(--color-neutral-10); }
+.qrActions a { border: 1px solid var(--color-neutral-4); }
+.qrMessage { @apply text-[15px] font-normal leading-[150%] tracking-[0]; margin-top: 12px; color: var(--color-orange-7); }
+.deleteDialog { width: 497px; border-radius: 17.4px; }
+.deleteDialog::backdrop { background: rgb(0 0 0 / .3); }
+.deleteCard { width: 100%; background: white; padding: 58px 40px 33px; }
+.deleteCard > div { gap: 43px; }
+.deleteCard p { width: 100%; }
+.deleteTitle { font-size: 22px; line-height: 1.5; }
+.deleteTitle + p { font-size: 18px; line-height: 1.5; letter-spacing: -.02em; }
+.deleteCard button { height: 52px; font-size: 21px; }
+.deleteError { @apply text-[15px] font-normal leading-[150%] tracking-[0]; margin: 0 24px 20px; color: var(--color-danger); text-align: center; }
+@keyframes pulse { 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .skeleton > div { animation: none; } }
+@media (max-width: 900px) {
+  .stats { gap: 12px; }
+  .stats > div { padding: 14px; }
+  .stats dd { font-size: 28px; }
+  .shortcuts button, .shortcuts > a { padding: 19px 16px; }
+  .shortcuts p { font-size: 17px; }
+  .shortcuts span { font-size: 22px; }
+}
+@media (max-width: 600px) {
+  .main { width: calc(100% - 32px); padding: 24px 0; gap: 16px; }
+  .overview { padding: 20px; }
+  .profile { flex-direction: column; align-items: flex-start; gap: 20px; }
+  .profileInfo { width: 100%; gap: 18px; }
+  .profileInfo h2 { font-size: 28px; }
+  .profileInfo p { font-size: 20px; }
+  .profileActions { flex-wrap: wrap; }
+  .noStore h2 { font-size: 24px; }
+  .stats { grid-template-columns: 1fr; gap: 10px; }
+  .stats > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .stats dt { font-size: 17px; }
+  .stats dd { font-size: 26px; }
+  .products { padding: 22px 12px 22px 20px; }
+  .scrolledCarousel { margin-left: -8px; }
+  .emptyProducts { min-height: 260px; padding: 36px 20px; }
+  .emptyProducts h2 { font-size: 24px; }
+  .emptyProducts p { font-size: 18px; }
+  .storeOnly .registerLink { font-size: 20px; }
+  .shortcuts { grid-template-columns: 1fr; gap: 12px; }
+  .shortcuts button, .shortcuts > a { padding: 19px 24px; }
+  .shortcuts p { font-size: 18px; }
+  .toast { top: 70px; }
+  .toast p { font-size: 15px; }
+  .qrDialog { padding: 24px 20px; }
+  .qrHeader h2 { font-size: 22px; }
+  .qrImage { margin: 28px auto; }
+  .qrUrl { padding: 9px 10px; }
+  .qrUrl input { font-size: 16px; }
+  .qrActions > * { font-size: 17px; }
+  .deleteCard { padding: 36px 24px 24px; }
+  .deleteTitle { font-size: 20px; }
+  .deleteTitle + p { font-size: 15px; }
+  .deleteCard > div { gap: 28px; }
+  .deleteCard button { font-size: 17px; }
+}
+@media print {
+  :global(body):has(.qrDialog[open]) > :not(.qrDialog) { display: none !important; }
+  .qrDialog { position: static; max-height: none; max-width: 100%; margin: 0 auto; overflow: visible; }
+  .qrDialog::backdrop, .qrHeader button, .qrUrl button, .qrActions, .qrMessage { display: none !important; }
+  .qrUrl input { font-size: 14px; }
+}
+
+.profileActions .editStore { font-weight: 700; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--color-neutral-5); border-radius: 6px; background: var(--color-neutral-2); }
+
+.dialog:focus { outline: none; }
+.copyIcon { width: 24px; height: 24px; background: var(--color-neutral-6); mask: url('/assets/icons/light/copy.svg') center / contain no-repeat; -webkit-mask: url('/assets/icons/light/copy.svg') center / contain no-repeat; }

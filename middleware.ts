@@ -3,7 +3,9 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  if (!request.nextUrl.pathname.startsWith('/admin')) {
+  const pathname = request.nextUrl.pathname;
+  const isSalesManagement = pathname === '/sales-management' || pathname.startsWith('/sales-management/');
+  if (!isSalesManagement && !pathname.startsWith('/admin')) {
     return NextResponse.next();
   }
 
@@ -12,13 +14,17 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
-  if (!token) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  if (!token || (isSalesManagement && (typeof token.id !== 'string' || !token.id.trim()))) {
+    const loginUrl = new URL('/login', request.url);
+    if (isSalesManagement) {
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${request.nextUrl.search}`);
+    }
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/admin/:path*'],
+  matcher: ['/admin/:path*', '/sales-management/:path*'],
 };

@@ -15,6 +15,7 @@ type Props = {
   lines: QrshopCartLine[]; agreed: boolean; submitting: boolean; error: string | null;
   onAgreementChange: (value: boolean) => void;
   onQuantityChange: (productId: string, next: number) => void; onRemove: (productId: string) => void; onSubmit: () => void;
+  onSelectLine: (productId: string) => void;
 };
 
 export default function QrshopCartPanel(props: Props) {
@@ -25,6 +26,7 @@ export default function QrshopCartPanel(props: Props) {
   const [dragging, setDragging] = useState(false);
   const [dragHeight, setDragHeight] = useState<number | null>(null);
   const total = lines.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
+  const checkMask = `url('/assets/icons/${agreed ? 'filled/Filled/Check.svg' : 'light/check.svg'}') center / contain no-repeat`;
   const canSubmit = Boolean(lines.length && agreed && !submitting);
 
   const startDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -90,12 +92,12 @@ export default function QrshopCartPanel(props: Props) {
           >
             <span aria-hidden className="h-1 w-10 rounded-full bg-neutral-5" />
           </button>
-          <div className="flex min-h-0 flex-1 flex-col px-4 pt-[11px]">
+          <div className="flex min-h-0 flex-1 flex-col px-4">
             <ul aria-label="선택 상품 목록" className="mb-[10px] max-h-[512px] shrink-0 space-y-[10px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {lines.map((line) => (
                 <li key={line.productId} className="rounded-[4px] bg-[#f2f4f6] px-[14px] py-[11px]">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0"><p className="typo-body-xsmall-bold truncate text-neutral-12">{line.productName}</p><p className="typo-body-xxsmall truncate text-neutral-7">{line.option ?? '단일 옵션'}</p></div>
+                    <button type="button" className="min-w-0 flex-1 text-left" aria-label={`${line.productName} 옵션 변경`} onClick={() => props.onSelectLine(line.productId)}><span className="typo-body-xsmall-bold block min-h-5 break-words text-neutral-12">{line.productName}</span><span className="typo-body-xxsmall block break-words text-neutral-7">{line.option ?? '단일 옵션'}{line.stock !== undefined ? ` · 재고 ${line.stock}개` : ''}</span></button>
                     <button type="button" className="h-5 w-5 text-xl leading-none text-neutral-6" aria-label={`${line.productName} 삭제`} onClick={() => props.onRemove(line.productId)}>×</button>
                   </div>
                   <div className="mt-2 flex items-center justify-between">
@@ -103,7 +105,7 @@ export default function QrshopCartPanel(props: Props) {
                     <div className="flex items-center gap-[13px]">
                       <button type="button" className="flex h-6 w-6 items-center justify-center rounded-[5px] border border-neutral-6 typo-body-small text-neutral-12 disabled:text-neutral-6" aria-label={`${line.productName} 수량 감소`} disabled={line.quantity <= 1} onClick={() => props.onQuantityChange(line.productId, line.quantity - 1)}>−</button>
                       <span className="w-3 text-center typo-body-xsmall-bold text-neutral-12">{line.quantity}</span>
-                      <button type="button" className="flex h-6 w-6 items-center justify-center rounded-[5px] border border-neutral-6 typo-body-small text-neutral-12 disabled:text-neutral-6" aria-label={`${line.productName} 수량 증가`} disabled={line.quantity >= 99} onClick={() => props.onQuantityChange(line.productId, line.quantity + 1)}>+</button>
+                      <button type="button" className="flex h-6 w-6 items-center justify-center rounded-[5px] border border-neutral-6 typo-body-small text-neutral-12 disabled:text-neutral-6" aria-label={`${line.productName} 수량 증가`} disabled={submitting || line.quantity >= Math.min(99, line.stock ?? 99)} onClick={() => props.onQuantityChange(line.productId, line.quantity + 1)}>+</button>
                     </div>
                   </div>
                 </li>
@@ -112,17 +114,20 @@ export default function QrshopCartPanel(props: Props) {
           </div>
         </div>
       ) : null}
-      <div className="shrink-0 bg-white px-4 pt-[11px]" style={{ paddingBottom: 'max(34px, env(safe-area-inset-bottom))' }}>
+      <div className={`shrink-0 bg-white px-4 ${lines.length === 0 ? 'pt-[13px]' : ''}`} style={{ paddingBottom: 'max(34px, env(safe-area-inset-bottom))' }}>
       <div className="flex items-center justify-between typo-body-small-bold"><span className="text-neutral-12">결제 금액</span><span className="text-orange-6">{formatWon(total)}</span></div>
-      <div className="mt-[10px] flex items-center gap-[5px] typo-body-xxsmall text-neutral-7">
-        <input id="qrshop-v2-agreement" type="checkbox" checked={agreed} disabled={lines.length === 0} onChange={(event) => props.onAgreementChange(event.target.checked)} className="h-[13px] w-[13px] rounded accent-orange-5" />
+      <div className="mt-[10px] flex min-h-[19px] items-center gap-[5px] typo-body-xxsmall text-neutral-7">
+        <span className="relative flex h-[13px] w-[13px] shrink-0 rounded-[3px] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-orange-5">
+          <input id="qrshop-v2-agreement" type="checkbox" checked={agreed} disabled={lines.length === 0} onChange={(event) => props.onAgreementChange(event.target.checked)} className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-default" />
+          <span aria-hidden className={`h-full w-full ${agreed && lines.length > 0 ? 'bg-orange-5' : 'bg-neutral-6'}`} style={{ mask: checkMask, WebkitMask: checkMask }} />
+        </span>
         <label htmlFor="qrshop-v2-agreement" className="cursor-pointer">결제 시, 쇼핑몰 이용약관 및 결제에 동의합니다.</label>
         <Link href="/terms/terms-of-service" aria-label="쇼핑몰 이용약관 보기" className="-ml-1 flex h-[13px] w-[13px] shrink-0 items-center justify-center">
           <Image src="/assets/icons/additional/Additional/Right-filled.svg" alt="" width={13} height={13} className="opacity-50" />
         </Link>
       </div>
       {error ? <p role="alert" className="mt-2 typo-body-xxsmall text-danger">{error}</p> : null}
-      <Button color="orange" size="s" status={canSubmit ? 'default' : 'disabled'} disabled={!canSubmit} className="mt-[14px] h-[35px] rounded-[4px]" onClick={props.onSubmit}>{submitting ? '주문 정보를 저장하는 중…' : '결제하기'}</Button>
+      <Button color="orange" size="s" status={canSubmit ? 'default' : 'disabled'} disabled={!canSubmit} className="mt-[14px] h-[35px] rounded-[4px] typo-body-xsmall-bold" onClick={props.onSubmit}>{submitting ? '주문 정보를 저장하는 중…' : '결제하기'}</Button>
       </div>
     </section>
   );

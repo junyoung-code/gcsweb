@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form';
 import { CheckboxButton, LoginSupportLinks, LogoSubtext, TextField } from '@/components/ui';
 import { type LoginInput } from '@/lib/validations/auth';
 import { cn } from '@/lib/utils';
+import { getLoginCallbackUrl } from '@/lib/auth-redirect';
 
 type LoginUiState = 'default' | 'warning' | 'blocked';
 
@@ -26,6 +27,7 @@ const MAX_FAILED_ATTEMPTS = 5;
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const callbackUrl = getLoginCallbackUrl(searchParams.get('callbackUrl'));
   const resetSuccess = searchParams.get('reset') === 'success';
   const isFromRestock = searchParams.get('from') === 'restock';
 
@@ -91,51 +93,63 @@ function LoginContent() {
 
     setLoginUiState('default');
 
-    const loginResponse = await fetch('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    setErrorMessage(null);
 
-    const loginResult = (await loginResponse.json().catch(() => null)) as LoginErrorResponse | null;
+    try {
+      const loginResponse = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-    if (!loginResponse.ok) {
-      const code = loginResult?.code;
-      const nextFailedAttempts = loginResult?.meta?.failedAttempts;
-      const nextMaxAttempts = loginResult?.meta?.maxAttempts;
-      const lockedUntil = loginResult?.meta?.lockedUntil ? new Date(loginResult.meta.lockedUntil).getTime() : null;
+      const loginResult = (await loginResponse.json().catch(() => null)) as LoginErrorResponse | null;
 
-      if (typeof nextFailedAttempts === 'number') setFailedAttempts(nextFailedAttempts);
-      if (typeof nextMaxAttempts === 'number' && nextMaxAttempts > 0) setMaxAttempts(nextMaxAttempts);
-      if (lockedUntil && Number.isFinite(lockedUntil)) setLockedUntilMs(lockedUntil);
+      if (!loginResponse.ok) {
+        const code = loginResult?.code;
+        const nextFailedAttempts = loginResult?.meta?.failedAttempts;
+        const nextMaxAttempts = loginResult?.meta?.maxAttempts;
+        const lockedUntil = loginResult?.meta?.lockedUntil ? new Date(loginResult.meta.lockedUntil).getTime() : null;
 
-      if (code === 'ACCOUNT_LOCKED') {
-        setLoginUiState('blocked');
-        setRememberEmail(true);
+        if (typeof nextFailedAttempts === 'number') setFailedAttempts(nextFailedAttempts);
+        if (typeof nextMaxAttempts === 'number' && nextMaxAttempts > 0) setMaxAttempts(nextMaxAttempts);
+        if (lockedUntil && Number.isFinite(lockedUntil)) setLockedUntilMs(lockedUntil);
+
+        if (code === 'ACCOUNT_LOCKED') {
+          setLoginUiState('blocked');
+          setRememberEmail(true);
+        } else if (code === 'AUTH_FAILED') {
+          setLoginUiState('warning');
+          setRememberEmail(true);
+        } else {
+          setErrorMessage('로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+        }
         return;
       }
 
-      setLoginUiState('warning');
-      setRememberEmail(true);
-      return;
+      const result = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        callbackUrl,
+        redirect: false,
+      });
+
+      if (!result?.ok || result.error) {
+        if (result?.error === 'CredentialsSignin') {
+          setLoginUiState('warning');
+          setRememberEmail(true);
+        } else {
+          setErrorMessage('로그인 세션을 만들지 못했습니다. 다시 시도해 주세요.');
+        }
+        return;
+      }
+
+      setFailedAttempts(0);
+      setLockedUntilMs(null);
+      router.push(callbackUrl);
+      router.refresh();
+    } catch {
+      setErrorMessage('로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
     }
-
-    const result = await signIn('credentials', {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
-
-    if (result?.error) {
-      setLoginUiState('warning');
-      setRememberEmail(true);
-      return;
-    }
-
-    setFailedAttempts(0);
-    setLockedUntilMs(null);
-    router.push('/');
-    router.refresh();
   };
 
   const resetWarningState = () => {
@@ -194,12 +208,16 @@ function LoginContent() {
               <button
                 type="button"
                 onClick={async () => {
-                  const res = await signIn('kakao', { callbackUrl: '/', redirect: false });
-                  if (res?.url) {
-                    window.location.href = res.url;
-                  } else if (res?.error) {
-                    console.error('Kakao signIn error:', res.error);
-                    alert('카카오 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+                  setErrorMessage(null);
+                  try {
+                    const res = await signIn('kakao', { callbackUrl, redirect: false });
+                    if (res?.error) {
+                      setErrorMessage('카카오 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.');
+                    } else if (res?.url) {
+                      window.location.href = res.url;
+                    }
+                  } catch {
+                    setErrorMessage('카카오 로그인을 시작할 수 없습니다. 잠시 후 다시 시도해 주세요.');
                   }
                 }}
                 className={cn(

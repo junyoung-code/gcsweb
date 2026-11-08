@@ -57,4 +57,10 @@ describe('QrshopProductCard', () => {
     expect(screen.getByRole('button').firstElementChild).toHaveClass('bg-orange-2');
     expect(container.querySelector('img')).not.toBeInTheDocument();
   });
+
+  it('긴 상품명과 옵션명을 카드 안에서 줄바꿈해 모두 표시한다', () => {
+    render(<QrshopProductCard product={{ ...product, name: '스무글자상품명을확인하는테스트용한정상품' }} optionNames={['아주긴옵션이름열다섯글자테스트']} selected={false} onSelect={() => undefined} />);
+    expect(screen.getByText('스무글자상품명을확인하는테스트용한정상품')).toHaveClass('break-all', 'whitespace-normal');
+    expect(screen.getByText('아주긴옵션이름열다섯글자테스트').parentElement).toHaveClass('break-all', 'whitespace-normal');
+  });
 });

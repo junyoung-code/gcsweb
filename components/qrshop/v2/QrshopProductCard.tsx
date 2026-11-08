@@ -7,16 +7,15 @@ type QrshopProductCardProps = {
   optionNames?: string[];
   selected: boolean;
   soldOut?: boolean;
+  disabled?: boolean;
   onSelect: () => void;
 };
 
-export default function QrshopProductCard({ product, optionNames, selected, soldOut = false, onSelect }: QrshopProductCardProps) {
+export default function QrshopProductCard({ product, optionNames, selected, soldOut = false, disabled = false, onSelect }: QrshopProductCardProps) {
   const visibleOptionNames = optionNames?.filter((option): option is string => Boolean(option)) ?? (product.option ? [product.option] : []);
-  const hasProductNameOverLimit = Array.from(product.name).length > 18;
-  const hasOptionNameOverLimit = visibleOptionNames.some((option) => Array.from(option).length > 18);
 
   return (
-    <button type="button" aria-pressed={selected} aria-label={`${product.name} ${visibleOptionNames.join(' ')} ${soldOut ? '품절' : '담기'}`} className={`group flex min-w-0 flex-col overflow-hidden rounded-[4px] bg-neutral-1 text-left transition ${soldOut ? 'cursor-pointer' : 'active:scale-[0.98]'}`} onClick={onSelect}>
+    <button type="button" disabled={disabled} aria-pressed={selected} aria-label={`${product.name} ${visibleOptionNames.join(' ')} ${soldOut ? '품절' : '담기'}`} className={`group flex min-w-0 flex-col overflow-hidden rounded-[4px] bg-neutral-1 text-left transition ${disabled ? 'cursor-default' : soldOut ? 'cursor-pointer' : 'active:scale-[0.98]'}`} onClick={onSelect}>
       <span className={`relative block aspect-square w-full overflow-hidden rounded-t-[4px] ${product.imageUrl ? 'bg-neutral-4' : 'bg-orange-2'}`}>
         {product.imageUrl ? (
           <Image src={product.imageUrl} alt="" fill sizes="(max-width: 430px) 46vw, 180px" className={`object-cover ${soldOut ? 'opacity-40' : ''}`} />
@@ -29,28 +28,10 @@ export default function QrshopProductCard({ product, optionNames, selected, sold
         ) : null}
       </span>
       <span className="flex min-h-[75px] w-full flex-col px-3 pb-[9px] pt-[7px]">
-        <span className="relative block min-w-0">
-          <span className="typo-body-xsmall-bold block overflow-x-auto whitespace-nowrap text-neutral-13 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{product.name}</span>
-          {hasProductNameOverLimit ? (
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-0 w-3"
-              style={{ background: 'linear-gradient(to right, rgb(255 255 255 / 0), #fff)' }}
-            />
-          ) : null}
-        </span>
+        <span className="typo-body-xsmall-bold block min-w-0 break-all whitespace-normal text-neutral-13">{product.name}</span>
         {visibleOptionNames.length ? (
-          <span className="relative block min-w-0">
-            <span className="typo-body-xxsmall block overflow-x-auto whitespace-nowrap text-neutral-7 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {visibleOptionNames.map((option, index) => <span key={option}>{index ? ' • ' : ''}{option}</span>)}
-            </span>
-            {hasOptionNameOverLimit ? (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 right-0 w-3"
-                style={{ background: 'linear-gradient(to right, rgb(255 255 255 / 0), #fff)' }}
-              />
-            ) : null}
+          <span className="typo-body-xxsmall block min-w-0 break-all whitespace-normal text-neutral-7">
+            {visibleOptionNames.map((option, index) => <span key={option}>{index ? ' • ' : ''}{option}</span>)}
           </span>
         ) : <span className="typo-body-xxsmall text-neutral-7">단일 옵션</span>}
         <span className="mt-auto flex items-center justify-between gap-2">

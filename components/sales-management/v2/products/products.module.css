@@ -1,0 +1,165 @@
+.page { min-height: 100vh; background: var(--color-neutral-4); color: var(--color-neutral-10); }
+.header { height: 58px; display: flex; align-items: center; gap: 44px; padding: 15px 24px; background: var(--color-neutral-4); box-shadow: 0 1px 2px #6351491a; }
+.header a { flex-shrink: 0; }
+.header h1 { font-size: 17px; font-weight: 700; line-height: 1.5; }
+.main { max-width: 1248px; margin: 0 auto; padding-bottom: 60px; }
+.tabs { display: flex; margin-top: 19px; margin-bottom: 43px; }
+.tabs a { padding: 4px 20px; font-size: 20px; line-height: 30px; color: var(--color-neutral-7); border-bottom: 1px solid transparent; }
+.tabs a[aria-current] { color: var(--color-orange-5); border-color: var(--color-orange-5); }
+.formTabs { margin-bottom: 40px; }
+.filters { display: flex; gap: 8px; margin-bottom: 21px; }
+.filter { width: 117px; flex-shrink: 0; position: relative; }
+.filter > button, .search { height: 52px; border: 1px solid var(--color-neutral-5); border-radius: 12px; background: var(--color-neutral-2); font-size: 18px; }
+.filter > button { font-size: 17px; color: var(--color-neutral-7); width: 100%; display: flex; gap: 8px; justify-content: space-between; align-items: center; padding: 12px 17px; white-space: nowrap; }
+.filter > .filterActive { border-color: var(--color-orange-5); }
+.rotated { transform: rotate(180deg); }
+.menu, .categoryMenu { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 2; border: 1px solid var(--color-neutral-5); border-radius: 8px; background: var(--color-neutral-2); padding: 8px 0; box-shadow: 0 2px 4px #0000000d; max-height: 260px; overflow-y: auto; }
+.menu button, .categoryMenu button { width: 100%; display: block; text-align: left; padding: 8px 17px; font-size: 17px; }
+.menu button:hover, .categoryMenu button:hover, .menu button:focus-visible, .categoryMenu button:focus-visible { background: var(--color-orange-2); }
+.search { display: flex; flex: 1; min-width: 0; align-items: center; padding: 12px 17px; gap: 12px; }
+.search input { background: transparent; width: 100%; outline: none; min-width: 0; }
+.search:focus-within { border-color: var(--color-orange-5); }
+.search input::placeholder { color: var(--color-neutral-7); }
+.search img { flex-shrink: 0; }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 36px; }
+.card { position: relative; padding: 27px; background: var(--color-neutral-1); border-radius: 12px; display: flex; gap: 31px; min-width: 0; }
+.photo, .upload { border-radius: 12px; width: 210px; height: 210px; position: relative; flex-shrink: 0; overflow: hidden; }
+.productImage { width: 100%; height: 100%; object-fit: cover; }
+.bagImage { position: absolute; width: 100%; height: 125.93%; max-width: none; left: .11%; top: -6.61%; }
+.cardInfo { min-width: 0; flex: 1; }
+.cardName { display: flex; gap: 12px; align-items: center; }
+.cardName h2 { font-size: 24px; line-height: 36px; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag { max-width: 40%; overflow: hidden; padding: 1px 10px; background: var(--color-orange-3); border-radius: 4px; flex-shrink: 0; height: 32px; }
+.tag > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; line-height: 30px; color: var(--color-neutral-10); }
+.price { font-size: 24px; font-weight: 700; line-height: 36px; margin-top: 10px; }
+.inventory { margin-top: 8px; color: var(--color-neutral-8); font-size: 17px; line-height: 25.5px; min-height: 55px; }
+.inventory p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inventory p + p { margin-top: 4px; }
+.cardActions { display: flex; gap: 11px; margin-top: 19px; }
+.cardActions a, .cardActions button { display: flex; justify-content: center; align-items: center; width: 100px; height: 45px; padding: 8px; border: 1px solid var(--color-neutral-6); border-radius: 6px; color: var(--color-neutral-7); background: var(--color-neutral-1); font-size: 19px; font-weight: 700; line-height: 28.5px; }
+.newTag { flex-shrink: 0; border: 1px solid var(--color-orange-4); color: var(--color-orange-5); padding: 1px 10px; border-radius: 4px; font-size: 17px; line-height: 30px; }
+.empty { text-align: center; color: var(--color-neutral-7); font-size: 20px; padding: 170px 16px; }
+.listEmpty { min-height: calc(100vh - 229px); display: flex; align-items: center; justify-content: center; padding: 24px; color: var(--color-neutral-12); font-size: 32px; line-height: 1.5; font-weight: 800; text-align: center; }
+.empty a, .empty button { text-decoration: underline; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 17px; padding: 57px 0; }
+.pagination button { min-width: 24px; font-size: 24px; line-height: 36px; color: var(--color-neutral-6); }
+.pagination button[aria-current] { color: var(--color-orange-5); }
+.pagination button:disabled { opacity: .45; }
+.form { background: var(--color-neutral-1); border-radius: 12px; padding: 36px 37px 55px; }
+.formLayout { display: flex; align-items: flex-start; gap: 41px; }
+.imageField { flex-shrink: 0; }
+.imageControl { position: relative; }
+.removeImage { position: absolute; top: 12px; right: 14px; z-index: 1; }
+.removeImage:focus-visible { outline: 2px solid var(--color-orange-5); outline-offset: 2px; }
+.imageHelp { margin-top: 8px; font-size: 15px; line-height: 1.5; color: var(--color-neutral-7); text-align: center; }
+.recentEmpty { padding: 40px 20px; background: var(--color-neutral-1); border-radius: 12px; color: var(--color-neutral-7); text-align: center; font-size: 22px; line-height: 1.5; font-weight: 700; }
+.dialog .completedModal { padding: 58px 40.5px 33px; }
+.upload { display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--color-orange-2); }
+.fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 41px; }
+.field label, .categoryField > label, .optionLabel { font-size: 22px; font-weight: 700; line-height: 33px; color: var(--color-neutral-10); }
+.form .fields .field > div > div + div { margin-top: 10px; }
+.field .input { color: var(--color-neutral-12); height: 50px; padding: 12px 16px; font-size: 17px; line-height: 25.5px; }
+.field .input:focus { border-color: var(--color-orange-5); }
+.field .input[readonly] { background: var(--color-neutral-4); color: var(--color-neutral-7); }
+.categoryField { position: relative; }
+.categoryInput { min-height: 50px; margin-top: 10px; padding: 12px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-neutral-5); border-radius: 8px; background: var(--color-neutral-2); }
+.categoryInput:focus-within { border-color: var(--color-orange-5); }
+.categoryInput input { flex: 1; min-width: 0; font-size: 17px; background: transparent; outline: none; }
+.categoryInput input::placeholder { color: var(--color-neutral-7); }
+.categoryInput > button { margin-left: auto; flex-shrink: 0; }
+.categoryTag { display: inline-flex; align-items: center; gap: 8px; background: var(--color-orange-3); border-radius: 4px; padding: 1px 8px; font-size: 17px; line-height: 30px; max-width: calc(100% - 28px); overflow-wrap: anywhere; }
+.categoryTag button { flex-shrink: 0; }
+.categoryMenu { top: 43px; padding: 0; border: 0; max-height: none; overflow: hidden; box-shadow: 0 0 2px #0000004d; }
+.categoryMenu > input { width: 100%; height: 50px; padding: 12px; font-size: 17px; background: var(--color-neutral-4); outline: none; }
+.categoryMenu > input::placeholder { color: var(--color-neutral-7); }
+.categoryResults { max-height: 200px; overflow-y: auto; }
+.categoryResults button { padding: 12px; }
+
+.priceStock { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 21px; }
+.optionChoice { display: flex; align-items: center; gap: 23px; min-width: 0; }
+.optionLabel { flex-shrink: 0; margin-right: 10px; }
+.optionChoice label { position: relative; display: flex; align-items: center; gap: 9px; font-size: 17px; color: var(--color-neutral-7); cursor: pointer; }
+.radio { position: absolute; top: 0; left: 0; width: 24px; height: 24px; opacity: 0; cursor: pointer; }
+.checkbox { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+.optionChoice input:focus-visible + .checkbox { outline: 2px solid var(--color-orange-5); outline-offset: 2px; }
+.optionPanel { margin-top: 14px; padding: 21px 37px; background: var(--color-neutral-4); border-radius: 8px; }
+.optionHead { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 30px; padding: 0; margin-bottom: 12px; font-size: 17px; line-height: 25.5px; color: var(--color-neutral-9); }
+.optionRow { display: grid; grid-template-columns: minmax(0, 1fr) 2px minmax(0, 1fr) 2px minmax(0, 1fr) 30px; align-items: center; gap: 16px; padding: 10px 20px; min-height: 52px; border: 1px solid var(--color-neutral-5); border-radius: 8px; background: var(--color-neutral-2); }
+.optionRow + .optionRow { margin-top: 18px; }
+.optionRow:focus-within { border-color: var(--color-orange-5); }
+.optionRow input { width: 100%; min-width: 0; background: transparent; outline: none; font-size: 17px; line-height: 25.5px; }
+.optionRow input::placeholder { color: var(--color-neutral-7); }
+.addOption { display: block; margin: 22px auto 0; }
+.fields .submit { width: 176px; height: 50px; padding: 10px 20px; font-size: 19px; line-height: 28.5px; border-radius: 8px; }
+.fields .submit:disabled { background: var(--color-orange-3); color: var(--color-neutral-2); }
+.registered { margin-top: 53px; }
+.registered > h2 { font-size: 22px; line-height: 33px; font-weight: 700; margin-bottom: 20px; }
+.dialog { width: min(497px, calc(100vw - 32px)); background: var(--color-neutral-2); border-radius: 17.4px; }
+dialog.dialog::backdrop { background: rgb(0 0 0 / .3); }
+.dialog .modal { width: 100%; padding: 58px 40.5px 33px; }
+.dialog .modalTitle { width: 100%; font-size: 21.733px; line-height: 33px; }
+.modal > div { gap: 43.5px; }
+.modal > div > div > p + p { width: 100%; font-size: 18.835px; line-height: 28px; letter-spacing: -.3767px; }
+.modal button { height: 52px; font-size: 21.733px; }
+.error { color: #b32318; font-size: 15px; line-height: 1.5; padding: 8px 0; }
+.dialog > .error { padding: 0 24px 20px; text-align: center; }
+@media (max-width: 1320px) {
+  .main { margin: 0 32px; }
+  .card { gap: 20px; padding: 22px; }
+  .photo { width: 170px; height: 170px; }
+  .cardName { flex-wrap: nowrap; gap: 4px 8px; }
+  .cardName h2 { font-size: 21px; line-height: 31px; }
+  .cardActions { margin-top: 12px; }
+  .optionPanel { padding: 20px; }
+}
+@media (max-width: 1023px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .card { gap: 31px; padding: 27px; }
+  .photo { width: 210px; height: 210px; }
+  .formLayout { gap: 24px; }
+  .form { padding: 28px; }
+  .upload { width: 150px; height: 150px; }
+  .optionRow { gap: 8px; padding: 10px; }
+  .optionHead { padding: 0; font-size: 15px; }
+  .optionRow input { font-size: 14px; }
+  .optionPanel { padding: 16px; }
+}
+@media (max-width: 767px) {
+  .header { gap: 24px; padding: 15px 16px; }
+  .main { margin: 0 16px; }
+  .tabs { margin-bottom: 28px; }
+  .tabs a { font-size: 18px; padding: 4px 16px; }
+  .card { padding: 18px; gap: 16px; flex-wrap: wrap; }
+  .photo { width: 100%; height: auto; aspect-ratio: 1; }
+  .cardInfo { flex-basis: 100%; }
+  .cardName h2 { font-size: 24px; line-height: 36px; }
+  .cardName { flex-wrap: nowrap; gap: 12px; }
+  .filter { width: 112px; }
+  .search { padding: 12px; }
+  .form { padding: 24px 18px; }
+  .formLayout { flex-direction: column; gap: 28px; }
+  .upload { width: 210px; height: 210px; }
+  .fields { width: 100%; gap: 28px; }
+  .field label, .categoryField > label, .optionLabel { font-size: 20px; }
+  .priceStock { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+  .optionChoice { gap: 16px; }
+  .optionLabel { margin-right: 16px; }
+  .optionChoice label { gap: 5px; font-size: 16px; }
+  .optionPanel { padding: 14px 10px; }
+  .optionHead { grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr)) 24px; padding: 0; font-size: 13px; }
+  .optionRow { grid-template-columns: minmax(0, 1.5fr) 2px minmax(0, 1fr) 2px minmax(0, 1fr) 30px; gap: 4px; padding: 8px 6px; }
+  .optionRow input { font-size: 13px; }
+  .registered { margin-top: 36px; }
+  .listEmpty { font-size: 24px; }
+  .empty { padding: 120px 12px; font-size: 18px; }
+  .dialog .modal { padding: 32px 20px 24px; }
+  .dialog .modalTitle { font-size: 20px; line-height: 30px; }
+  .modal > div > div > p + p { font-size: 15px; }
+}
+
+.placeholder { background: var(--color-orange-2); }
+.field .input:has(+ div button) { padding-right: 44px; }
+.clearName { display: flex; align-items: center; justify-content: center; }
+.optionRow input, .categoryMenu input, .categoryInput input { color: var(--color-neutral-12); }
+.optionChoice label { white-space: nowrap; }
+.input::-webkit-contacts-auto-fill-button { visibility: hidden; pointer-events: none; }

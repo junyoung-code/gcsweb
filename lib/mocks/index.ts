@@ -15,3 +15,10 @@ export {
   qrshopProducts,
   qrshopQaProducts,
 } from './qrshop-data';
+export {
+  createMockSalesManagementLandingService,
+  createSalesManagementMockService,
+  salesManagementMockService,
+  type SalesManagementLandingMockState,
+  type SalesManagementMockOptions,
+} from './sales-management-service';
